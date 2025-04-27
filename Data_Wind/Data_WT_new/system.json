@@ -1,0 +1,66 @@
+{	
+    "conduct_scenario_analysis": true,
+	
+    "set_conversion_technologies": [
+        "Bauxite_Aluminium",
+	"Carbon_Fiber_Blade",
+	"Copper_Ore_Copper",
+	"Iron_Ore_Steel",
+	"Limestone_Concrete",
+	"Nacelle_Factory",
+	"Oil_Carbon_Fiber",
+	"Permanent_Magnets_Factory",
+	"REE_Ore_REE",
+	"Tower_Factory",
+	"Turbine_Installation"
+    ],
+    "set_storage_technologies": [
+        "Aluminium_storage",
+	"Bauxite_storage",
+	"Blade_storage",
+	"Carbon_Fiber_storage",
+	"Concrete_storage",
+	"Copper_Ore_storage",
+	"Copper_storage",
+	"Iron_Ore_storage",
+	"Limestone_storage",
+	"Nacelle_storage",
+	"Oil_storage",
+	"Permanent_Magnets_storage",
+	"REE_Ore_storage",
+	"REE_storage",
+	"Steel_storage",
+	"Tower_storage",
+	"Turbine_storage"
+    ],
+    "set_transport_technologies": [
+        "Aluminium_transport",
+	"Bauxite_transport",
+	"Blade_transport",
+	"Carbon_Fiber_transport",
+	"Concrete_transport",
+	"Copper_Ore_transport",
+	"Copper_transport",
+	"Iron_Ore_transport",
+	"Limestone_transport",
+	"Nacelle_transport",
+	"Oil_transport",
+	"Permanent_Magnets_transport",
+	"REE_Ore_transport",
+	"REE_transport",
+	"Steel_transport",
+	"Tower_transport",
+	"Turbine_transport"
+    ],
+    "set_nodes": [
+        "AUS","BRA","CHE","CHN","DEU","DNK","GBR","IND","JPN","NLD","ROE","ROW","SWE","USA"
+    ],
+    "reference_year": 2021,
+    "unaggregated_time_steps_per_year": 1,
+    "aggregated_time_steps_per_year": 1,
+    "conduct_time_series_aggregation": false,
+    "optimized_years": 10,
+    "interval_between_years": 1,
+    "use_rolling_horizon": false,
+    "years_in_rolling_horizon": 1
+}

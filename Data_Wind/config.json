@@ -1,0 +1,16 @@
+{
+    "analysis": {
+        "dataset":"Data_WT",
+        "objective":"total_cost",
+        "use_capacities_existing":true
+    },
+    "solver": {
+        "name":"gurobi",
+        "analyze_numerics":true,
+        "immutable_unit": [
+            "hour",
+            "km"
+        ]
+    }
+}		
+   
