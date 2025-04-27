@@ -1,0 +1,14 @@
+name: zen-garden-env
+channels:
+  - conda-forge
+  - gurobi
+dependencies:
+  - pip
+  - python=3.12
+  - pip:
+      - -e .[dev,vis,gurobipy,docs]
+
+# conda env create -f zen_garden_env.yml
+# conda remove --name zen-garden-env --all
+# -channels --> gurobi
+#,gurobipy
