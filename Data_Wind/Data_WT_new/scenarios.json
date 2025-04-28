@@ -1,4 +1,0 @@
-{
-  "1": {"set_transport_technologies": {"capacity_limit": {"file": "capacity_limit_NOCHN"}}},
-  "2": {"set_transport_technologies": {"capacity_limit": {"file": "capacity_limit_europeonly"}}}
-}

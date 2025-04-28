@@ -10,6 +10,9 @@ zen_garden_env/
 *.DS_Store
 .coverage
 
+# Ignore all AppleDouble files
+._*
+
 # pytest monitor
 .pymon
 
