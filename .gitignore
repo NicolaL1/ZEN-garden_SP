@@ -2,7 +2,6 @@
 ##############
 /.idea
 /.vscode
-
 outputs*/
 zen_garden_env/
 *.swp
