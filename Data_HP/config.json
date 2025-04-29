@@ -1,0 +1,8 @@
+{
+    "analysis": {
+        "dataset":"Data_HP"
+    },
+    "solver": {
+        "name":"gurobi"
+    }
+}
