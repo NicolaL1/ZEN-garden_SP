@@ -56,7 +56,7 @@
         "AUS","BRA","CHE","CHN","DEU","DNK","GBR","IND","JPN","NLD","ROE","ROW","SWE","USA"
     ],
     "reference_year": 2021,
-    "unaggregated_time_steps_per_year": 100,
+    "unaggregated_time_steps_per_year": 1,
     "aggregated_time_steps_per_year": 1,
     "conduct_time_series_aggregation": false,
     "optimized_years": 10,
