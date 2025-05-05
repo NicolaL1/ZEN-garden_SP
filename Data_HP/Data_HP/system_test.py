@@ -30,7 +30,8 @@ system['set_nodes']                      = ["AUS", "AUT", "CHN", "CZE", "ITA", "
 system["reference_year"]                 = 2022
 system["unaggregated_time_steps_per_year"]  = 1
 system["aggregated_time_steps_per_year"]    = 1
-system["conduct_time_series_aggregation"]  = False
+system["conduct_time_series_aggregation"]  = True
+
 
 system["optimized_years"]                = 12
 system["interval_between_years"]          = 1

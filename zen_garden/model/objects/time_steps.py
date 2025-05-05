@@ -1,4 +1,9 @@
 """
+:Title:        ZEN-GARDEN
+:Created:      October-2021
+:Authors:      Alissa Ganter (aganter@ethz.ch)
+:Organization: Laboratory of Reliability and Risk Engineering, ETH Zurich
+
 This file implements a helper class to deal with timesteps
 """
 
@@ -170,20 +175,16 @@ class TimeStepsDicts(object):
 
         :param system: dictionary defining the system
         """
-        unaggregated_time_steps = system.unaggregated_time_steps_per_year
+        unaggregated_time_steps = system["unaggregated_time_steps_per_year"]
         sequence_time_steps = self.sequence_time_steps_storage
         counter = 0
         time_steps_start = []
         time_steps_end = []
-        assert system.interval_between_years == 1 or not system.multiyear_periodicity, "The interval between years should be 1 for multiyear storage periodicity."
-        if not system.multiyear_periodicity:
-            while counter < len(sequence_time_steps):
-                time_steps_start.append(sequence_time_steps[counter])
-                counter += unaggregated_time_steps
-                time_steps_end.append(sequence_time_steps[counter - 1])
-            self.time_steps_storage_level_startend_year = {start: end for start, end in zip(time_steps_start, time_steps_end)}
-        else:
-            self.time_steps_storage_level_startend_year = {self.sequence_time_steps_storage[0]: self.sequence_time_steps_storage[-1]}
+        while counter < len(sequence_time_steps):
+            time_steps_start.append(sequence_time_steps[counter])
+            counter += unaggregated_time_steps
+            time_steps_end.append(sequence_time_steps[counter - 1])
+        self.time_steps_storage_level_startend_year = {start: end for start, end in zip(time_steps_start, time_steps_end)}
 
     def get_time_steps_year2operation(self, year=None):
         """ gets the dict of converting the invest time steps to the operation time steps of technologies
@@ -249,8 +250,8 @@ class TimeStepsDicts(object):
     def convert_time_step_energy2power(self, time_step_energy):
         """ converts the time step of the energy quantities of a storage technology to the time step of the power quantities
 
-        :param time_step_energy: time step of energy quantities
-        :return: time step of power quantities
+        :param time_step_energy: #TODO describe parameter/return
+        :return: #TODO describe parameter/return
         """
         time_steps_energy2power = self.time_steps_energy2power
         return time_steps_energy2power[time_step_energy]
@@ -258,8 +259,8 @@ class TimeStepsDicts(object):
     def convert_time_step_operation2year(self, time_step_operation):
         """ converts the operational time step to the invest time step
 
-        :param time_step_operation: time step of operational time steps
-        :return: time step of invest time steps
+        :param time_step_operation: #TODO describe parameter/return
+        :return: #TODO describe parameter/return
         """
         time_steps_operation2year = self.time_steps_operation2year
         return time_steps_operation2year[time_step_operation]

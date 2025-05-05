@@ -1,6 +1,11 @@
 """
-Class defining a standard Element.
-Contains methods to add parameters, variables and constraints to the
+:Title:          ZEN-GARDEN
+:Created:        October-2021
+:Authors:        Alissa Ganter (aganter@ethz.ch),
+                Jacob Mannhardt (jmannhardt@ethz.ch)
+:Organization:   Laboratory of Reliability and Risk Engineering, ETH Zurich
+
+Class defining a standard Element. Contains methods to add parameters, variables and constraints to the
 optimization problem. Parent class of the Carrier and Technology classes .The class takes the concrete
 optimization model as an input.
 """
@@ -44,8 +49,7 @@ class Element:
         # create DataInput object
         self.data_input = DataInput(element=self, system=self.optimization_setup.system,
                                     analysis=self.optimization_setup.analysis, solver=self.optimization_setup.solver,
-                                    energy_system=self.energy_system, unit_handling=self.energy_system.unit_handling,
-                                    optimization_setup=self.optimization_setup)
+                                    energy_system=self.energy_system, unit_handling=self.energy_system.unit_handling)
         # dict to save the parameter units element-wise (and save them in the results later on)
         self.units = {}
 
@@ -57,7 +61,7 @@ class Element:
         paths = self.optimization_setup.paths
         # check if class is a subset
         if class_label not in paths.keys():
-            subsets = self.optimization_setup.analysis.subsets
+            subsets = self.optimization_setup.analysis["subsets"]
             # iterate through subsets and check if class belongs to any of the subsets
             for set_name, subsets_list in subsets.items():
                 if class_label in subsets_list:
@@ -84,35 +88,30 @@ class Element:
         t_start = time.perf_counter()
         cls.construct_sets(optimization_setup)
         t1 = time.perf_counter()
-        if optimization_setup.solver.run_diagnostics:
-            logging.info(f"Time to construct Sets: {t1 - t_start:0.1f} seconds")
-            logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
+        logging.info(f"Time to construct Sets: {t1 - t_start:0.1f} seconds")
+        logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
         # construct Params
         t0 = time.perf_counter()
         cls.construct_params(optimization_setup)
         t1 = time.perf_counter()
-        if optimization_setup.solver.run_diagnostics:
-            logging.info(f"Time to construct Params: {t1 - t0:0.1f} seconds")
-            logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
+        logging.info(f"Time to construct Params: {t1 - t0:0.1f} seconds")
+        logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
         # construct Vars
         t0 = time.perf_counter()
         cls.construct_vars(optimization_setup)
         t1 = time.perf_counter()
-        if optimization_setup.solver.run_diagnostics:
-            logging.info(f"Time to construct Vars: {t1 - t0:0.1f} seconds")
-            logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
+        logging.info(f"Time to construct Vars: {t1 - t0:0.1f} seconds")
+        logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
         # construct Constraints
         t0 = time.perf_counter()
         cls.construct_constraints(optimization_setup)
         t1 = time.perf_counter()
-        if optimization_setup.solver.run_diagnostics:
-            logging.info(f"Time to construct Constraints: {t1 - t0:0.1f} seconds")
-            logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
+        logging.info(f"Time to construct Constraints: {t1 - t0:0.1f} seconds")
+        logging.info(f"Memory usage: {psutil.Process(pid).memory_info().rss / 1024 ** 2:0.1f} MB")
         # construct Objective
         optimization_setup.energy_system.construct_objective()
         t_end = time.perf_counter()
-        if optimization_setup.solver.run_diagnostics:
-            logging.info(f"Total time to construct model components: {t_end - t_start:0.1f} seconds")
+        logging.info(f"Total time to construct model components: {t_end - t_start:0.1f} seconds")
 
     @classmethod
     def construct_sets(cls, optimization_setup):
@@ -256,9 +255,9 @@ class Element:
                         elif index == "set_capacity_types":
                             system = optimization_setup.system
                             if element in sets["set_storage_technologies"]:
-                                list_sets.append(system.set_capacity_types)
+                                list_sets.append(system["set_capacity_types"])
                             else:
-                                list_sets.append([system.set_capacity_types[0]])
+                                list_sets.append([system["set_capacity_types"][0]])
                         else:
                             raise NotImplementedError(f"Index <{index}> not known")
                     # append indices to custom_set if element is supposed to be appended
@@ -300,8 +299,8 @@ class GenericRule(object):
     """
 
     def __init__(self, optimization_setup):
-        """Constructor for generic rule
-
+        """
+        Constructor for generic rule
         :param optimization_setup: The optimization setup to use for the setup
         """
 
@@ -318,10 +317,7 @@ class GenericRule(object):
 
     # helper methods for constraint rules
     def get_year_time_step_array(self,storage = False):
-        """ returns array with year and time steps of each year
-
-        :param storage: boolean indicating if object is a storage object
-        """
+        """ returns array with year and time steps of each year """
         # create times xarray with 1 where the operation time step is in the year
         if storage:
             meth = self.time_steps.get_time_steps_year2storage
@@ -350,7 +346,7 @@ class GenericRule(object):
         for ts in self.sets["set_time_steps_storage"]:
             ts_end = self.energy_system.time_steps.get_time_steps_storage_startend(ts)
             if ts_end is not None:
-                if self.system.storage_periodicity:
+                if self.system["storage_periodicity"]:
                     times_prev.append(ts_end)
                     mask.append(True)
                 else:
@@ -378,11 +374,7 @@ class GenericRule(object):
         return times
 
     def map_and_expand(self, array, mapping):
-        """ maps and expands array
-
-        :param array: xarray to map and expand
-        :param mapping: pd.Series with mapping values
-        """
+        """ maps and expands array """
         assert (isinstance(mapping, pd.Series) or isinstance(mapping.index, pd.Index)), "Mapping must be a pd.Series or with a single-level pd.Index"
         # get mapping values
         array = array.sel({mapping.name: mapping.values})
@@ -393,11 +385,7 @@ class GenericRule(object):
         return array
 
     def align_and_mask(self, expr, mask):
-        """ aligns and masks expr
-
-        :param expr: expression to align and mask
-        :param mask: mask to apply
-        """
+        """ aligns and masks expr """
         if isinstance(expr, xr.DataArray):
             aligner = expr
         elif isinstance(expr, lp.Variable):
@@ -407,32 +395,3 @@ class GenericRule(object):
         mask = xr.align(mask, aligner, join="right")[0]
         expr = expr.where(mask)
         return expr
-
-    def get_flow_expression_conversion(self,techs, nodes, factor=None, rename=False):
-        """ return the flow expression for conversion technologies """
-        reference_flows = []
-        for t in techs:
-            rc = self.sets["set_reference_carriers"][t][0]
-            if factor is not None:
-                mult = factor.loc[t, nodes]
-            else:
-                mult = 1
-            # TODO can we avoid the indexing here?
-            if rc in self.sets["set_input_carriers"][t]:
-                reference_flows.append(mult * self.variables["flow_conversion_input"].loc[t, rc, nodes, :])
-            else:
-                reference_flows.append(mult * self.variables["flow_conversion_output"].loc[t, rc, nodes, :])
-        if rename:
-            term_reference_flow = lp.merge(reference_flows, dim="set_technologies").rename(
-                {"set_nodes": "set_location"})
-        else:
-            term_reference_flow = lp.merge(reference_flows, dim="set_conversion_technologies")
-        return term_reference_flow
-
-    def get_flow_expression_storage(self,rename=True):
-        """ return the flow expression for storage technologies """
-        term = (self.variables["flow_storage_charge"] + self.variables["flow_storage_discharge"])
-        if rename:
-            return term.rename({"set_storage_technologies": "set_technologies", "set_nodes": "set_location"})
-        else:
-            return term

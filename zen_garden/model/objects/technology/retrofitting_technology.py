@@ -1,4 +1,9 @@
 """
+:Title: ZEN-GARDEN
+:Created: October-2021
+:Authors:   Alissa Ganter (aganter@ethz.ch), Jacob Mannhardt (jmannhardt@ethz.ch)
+:Organization: Laboratory of Reliability and Risk Engineering, ETH Zurich
+
 Class defining the parameters, variables, and constraints of the retrofitting technologies.
 The class takes the abstract optimization model as an input and adds parameters, variables, and
 constraints of the retrofitting technologies.
@@ -18,7 +23,7 @@ from ..element import GenericRule
 
 class RetrofittingTechnology(ConversionTechnology):
     """
-    Class defining retrofitting technologies
+    Class defining conversion technologies
     """
     # set label
     label = "set_retrofitting_technologies"
@@ -82,22 +87,21 @@ class RetrofittingTechnology(ConversionTechnology):
         # flow coupling of retrofitting technology and its base technology
         rules.constraint_retrofit_flow_coupling()
 
-
 class RetrofittingTechnologyRules(GenericRule):
     """
     Rules for the RetrofittingTechnology class
     """
 
     def __init__(self, optimization_setup):
-        """Inits the rules for a given EnergySystem
-
+        """
+        Inits the rules for a given EnergySystem
         :param optimization_setup: The OptimizationSetup the element is part of
         """
 
         super().__init__(optimization_setup)
 
     def constraint_retrofit_flow_coupling(self):
-        r""" couples reference flow variables based on modeling technique
+        """ couples reference flow variables based on modeling technique
 
         .. math::
             \mathrm{if\ reference\ carrier\ in\ input\ carriers}\ \\underline{G}_{i,n,t}^\mathrm{r} = G^\mathrm{d,approximation}_{i,n,t}
@@ -128,7 +132,7 @@ class RetrofittingTechnologyRules(GenericRule):
              self.sets["set_retrofitting_base_technologies"][t]},
             name="set_conversion_technologies")
         retrofit_base_technologies.index.name = "set_conversion_technologies"
-        retrofit_flow_coupling = self.parameters.retrofit_flow_coupling_factor.rename({"set_retrofitting_technologies": "set_conversion_technologies"})
+        retrofit_flow_coupling =  self.parameters.retrofit_flow_coupling_factor.rename({"set_retrofitting_technologies": "set_conversion_technologies"})
         term_flow_retrofit = self.map_and_expand(term_flow_reference, retrofit_base_technologies)
         term_flow_base = term_flow_reference.sel({"set_conversion_technologies": self.sets["set_retrofitting_technologies"]})
         lhs = term_flow_base - retrofit_flow_coupling * term_flow_retrofit

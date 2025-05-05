@@ -1,5 +1,10 @@
-"""
-Function that loads all classes and subclasses of carrier directory.
+"""==========
+:Title:        ZEN-GARDEN
+:Created:      March-2022
+:Authors:      Alissa Ganter (aganter@ethz.ch)
+:Organization: Laboratory of Reliability and Risk Engineering, ETH Zurich
+
+  function that loads all classes and subclasses of carrier directory.
 """
 from pathlib import Path
 

@@ -1,6 +1,10 @@
 """
-File that contains the classes which initialize parameters, variables and constraints.
-This is a proxy for pyomo parameters, since the construction of parameters has a significant overhead. Indexing within ZEN-garden is also defined here.
+:Title:          ZEN-GARDEN
+:Created:        July-2022
+:Authors:        Jacob Mannhardt (jmannhardt@ethz.ch)
+:Organization:   Laboratory of Reliability and Risk Engineering, ETH Zurich
+
+Class containing parameters. This is a proxy for pyomo parameters, since the construction of parameters has a significant overhead.
 """
 import copy
 import itertools
@@ -22,8 +26,8 @@ class ZenIndex(object):
     """
 
     def __init__(self, index_values, index_names=None):
-        """Initialize the multiindex
-
+        """
+        Initialize the multiindex
         :param index_values: A list of index values as tuples
         :param index_names: Optional list of index names as strings, if the length does not match the tuple length,
                             it is ignored
@@ -43,8 +47,8 @@ class ZenIndex(object):
             self.df = pd.Series(np.ones(len(self.index)), index=self.index)
 
     def get_unique(self, levels, as_array=False):
-        """Returns a list of unique tuples across potentially multiple levels
-
+        """
+        Returns a list of unique tuples across potentially multiple levels
         :param levels: A list of levels eithes by position or name
         :param as_array: If True, the return value a list of xarrays
         :return: A list of tuples if multiple levels are given, otherwise a list of values
@@ -63,8 +67,8 @@ class ZenIndex(object):
         return vals
 
     def get_values(self, locs, levels, dtype=list, unique=False):
-        """Get all values of the levels over a given set of locations
-
+        """
+        Get all values of the levels over a given set of locations
         :param locs: A list of locs used for the "get_locs" method of the index
         :param levels: A single level or a list of levels to get the values for
         :param dtype: The dtype of the return value, either list or xr.DataArray
@@ -120,8 +124,8 @@ class ZenSet(OrderedSet):
     """
 
     def __init__(self, data, name="", doc="", index_set="UnnamedIndex"):
-        """Initialize the set
-
+        """
+        Initialize the set
         :param data: The data of the set, either an iterable or a dictionary for an indexed set
         :param name: The name of the set
         :param doc: The corresponding docstring
@@ -177,8 +181,8 @@ class ZenSet(OrderedSet):
         return f"{super().__repr__()} indexed={self.indexed}"
 
     def __getitem__(self, item):
-        """Get an item from the set, if it is indexed
-
+        """
+        Get an item from the set, if it is indexed
         :param item: The item to retrieve
         :return: The item
         """
@@ -264,8 +268,8 @@ class IndexSet(Component):
         self.coords_dataset = xr.Dataset()
 
     def add_set(self, name, data, doc, index_set=None):
-        """Adds a set to the IndexSets (this set it not indexed)
-
+        """
+        Adds a set to the IndexSets (this set it not indexed)
         :param data: The data used for the init
         :param doc: The docstring of the set
         :param index_set: The name of the index set if the set it self is indexed
@@ -282,8 +286,8 @@ class IndexSet(Component):
             self.index_sets[name] = index_set
 
     def is_indexed(self, name):
-        """Checks if the set with the name is indexed, convenience method for ZenSet["name"].is_indexed()
-
+        """
+        Checks if the set with the name is indexed, convenience method for ZenSet["name"].is_indexed()
         :param name: The name of the set
         :return: True if indexed, False otherwise
         """
@@ -291,8 +295,8 @@ class IndexSet(Component):
         return name in self.index_sets
 
     def get_index_name(self, name):
-        """Returns the index name of an indexed set, convenience method for ZenSet["name"].get_index_name()
-
+        """
+        Returns the index name of an indexed set, convenience method for ZenSet["name"].get_index_name()
         :param name: The name of the indexed set
         :return: The name of the index set
         """
@@ -303,8 +307,8 @@ class IndexSet(Component):
 
     @staticmethod
     def tuple_to_arr(index_values, index_list, unique=False):
-        """Transforms a list of tuples into a list of xarrays containing all elements from the corresponding tuple entry
-
+        """
+        Transforms a list of tuples into a list of xarrays containing all elements from the corresponding tuple entry
         :param index_values: The list of tuples with the index values
         :param index_list: The names of the indices, used in case of emtpy values
         :param unique: If True, the values are unique
@@ -334,8 +338,8 @@ class IndexSet(Component):
         return tuple(index_arrs)
 
     def indices_to_mask(self, index_values, index_list, bounds, model=None):
-        """Transforms a list of index values into a mask
-
+        """
+        Transforms a list of index values into a mask
         :param index_values: A list of index values (tuples)
         :param index_list: The list of the names of the indices
         :param bounds: Either None, tuple, array or callable to define the bounds of the variable
@@ -356,7 +360,6 @@ class IndexSet(Component):
 
     def create_variable_bounds(self, bounds, coords, index_arrs, index_list, index_values):
         """ creates the bounds for the variables
-
         :param bounds: The bounds of the variable
         :param coords: The coordinates of the variable
         :param index_arrs: The index values as xarrays
@@ -395,7 +398,6 @@ class IndexSet(Component):
 
     def create_variable_mask(self, coords, index_arrs, index_list, model):
         """ creates the mask for the variables
-
         :param coords: The coordinates of the variable
         :param index_arrs: The index values as xarrays
         :param index_list: The list of the index names
@@ -419,10 +421,10 @@ class IndexSet(Component):
         return index_list, mask
 
     def get_coord(self, data, name):
-        """Transforms the data into a proper coordinate. If the name of the data is in a set, the sets superset is
+        """
+        Transforms the data into a proper coordinate. If the name of the data is in a set, the sets superset is
         returned otherwise all unique data values are returned, this is to avoid having sets with the same name
         and different values
-
         :param data: The data to transform
         :param name: The name of the set
         :return: The proper coordinate
@@ -434,8 +436,8 @@ class IndexSet(Component):
             return np.unique(data)
 
     def __getitem__(self, name):
-        """Returns a set
-
+        """
+        Returns a set
         :param name: The name of the set to get
         :return: The set that has the name
         """
@@ -443,8 +445,8 @@ class IndexSet(Component):
         return self.sets[name]
 
     def __contains__(self, item):
-        """The is for the "in" keyword
-
+        """
+        The is for the "in" keyword
         :param item: The item to check
         :return: True if item is contained, False otherwies
         """
@@ -452,8 +454,8 @@ class IndexSet(Component):
         return item in self.sets
 
     def __iter__(self):
-        """Returns an iterator over the sets
-
+        """
+        Returns an iterator over the sets
         :return: The iterator
         """
 
@@ -466,8 +468,8 @@ class DictParameter(object):
     """
 
     def add_param(self, name, data):
-        """Add a parameter
-
+        """
+        Add a parameter
         :param name: The name of the param
         :param data: The data of the param
         """
@@ -527,7 +529,6 @@ class Parameter(Component):
     def add_helper_parameter(self, name, data):
         """Adds a helper param. Note that this param won't be added to the docs and therefore not saved in the results.
         Also, the data is taken as is and is not transformed
-
         :param name: The name of the param
         :param data: The data
         """
@@ -654,8 +655,7 @@ class Variable(Component):
     def __init__(self, optimization_setup):
         """
         Initialization of a variable
-
-        :param optimization_setup: OptimizationSetup object
+        :param index_sets: A reference to the index sets of the model
         """
         self.optimization_setup = optimization_setup
         self.index_sets = optimization_setup.sets
@@ -676,11 +676,11 @@ class Variable(Component):
         :param doc: docstring of variable
         :param mask: mask of variable
         """
+
         if name not in self.docs.keys():
             index_values, index_list = self.get_index_names_data(index_sets)
             mask_index, lower, upper = self.index_sets.indices_to_mask(index_values, index_list, bounds, model)
             if mask is not None:
-                mask = mask.reindex_like(mask_index,fill_value=False)
                 mask_index = mask_index & mask
             model.add_variables(lower=lower, upper=upper, integer=integer, binary=binary, name=name, mask=mask_index, coords=mask_index.coords)
 
@@ -699,26 +699,25 @@ class Variable(Component):
                 else:
                     domain = "Reals"
             self.docs[name] = self.compile_doc_string(doc, index_list, name, domain)
-            self.units[name] = self.get_var_units(unit_category, index_values, index_list,mask_index)
+            self.units[name] = self.get_var_units(unit_category, index_values, index_list)
         else:
             logging.warning(f"Variable {name} already added. Can only be added once")
 
-    def get_var_units(self, unit_category, var_index_values, index_list,mask=None):
+    def get_var_units(self, unit_category, var_index_values, index_list):
         """
          creates series of units with identical multi-index as variable has
 
         :param unit_category: dict defining the dimensionality of the variable's unit
         :param var_index_values: list of variable index values
         :param index_list: list of index names
-        :param mask: mask of variable
         :return: series of variable units
         """
         # if not check_unit_consistency
         if not self.optimization_setup.solver.check_unit_consistency:
-            return None
+            return
         # binary variables
         if not unit_category:
-            return None
+            return
         if all(isinstance(item, tuple) for item in var_index_values):
             index = pd.MultiIndex.from_tuples(var_index_values, names=index_list)
         else:
@@ -753,12 +752,12 @@ class Variable(Component):
         # variable has constant unit
         else:
             var_units[:] = str(unit.units)
-        return var_units[mask.to_series()]
+        return var_units
 
 class Constraint(Component):
     def __init__(self, index_sets,model):
-        """Initialization of a constraint
-
+        """
+        Initialization of a constraint
         :param index_sets: A reference to the index sets of the model
         :param model: A reference to the linopy model
         """
@@ -766,12 +765,13 @@ class Constraint(Component):
         self.index_sets = index_sets
         self.model = model
         super().__init__()
+        # This is the big-M for the constraints if the variables inside an expression are not bounded
+        self.M = np.iinfo(np.int32).max
 
     def add_constraint(self, name, constraint, doc=""):
         """ initialization of a constraint
-
         :param name: name of variable
-        :param constraint: either a linopy constraint or a dictionary of constraints or None
+        :param constraint: either a linopy constraint or a dictionary of constraints or None TODO
         :param doc: docstring of variable"""
 
         if name not in self.docs.keys():
@@ -798,9 +798,115 @@ class Constraint(Component):
         else:
             logging.warning(f"{name} already added. Can only be added once")
 
+    def add_constraint_block(self, model: lp.Model, name, constraint, doc="", disjunction_var=None):
+        """ initialization of a constraint block (list of constraints)
+        :param model: The linopy model
+        :param name: name of variable
+        :param constraint: The constraint to add
+        :param doc: docstring of variable
+        :param disjunction_var: An optional binary variable. The constraints will only be enforced if this variable is
+                                True
+        """
+
+        # convert to list
+        use_suffix = True
+        if not isinstance(constraint, list):
+            constraint = [constraint]
+            use_suffix = False
+
+        for num, cons in enumerate(constraint):
+            current_name = f"{name}"
+            if use_suffix:
+                current_name += f"_{num}"
+            if current_name not in self.docs.keys():
+                # if the cons is a tuple we have a mask
+                if isinstance(cons, tuple):
+                    cons, mask = cons
+                else:
+                    mask = None
+
+                # drop all unnecessary dimensions
+                # FIXME: we do this via data to avoid the drop deprecation warning, update once lp implements drop_vars
+                # lhs = cons.lhs.drop(list(set(cons.lhs.coords) - set(cons.lhs.dims)))
+                if not isinstance(cons, lp.constraints.AnonymousScalarConstraint):
+                    lhs = lp.LinearExpression(cons.lhs.data.drop_vars(list(set(cons.lhs.coords) - set(cons.lhs.dims))), model)
+                else:
+                    lhs = cons.lhs
+                # add constraint
+                self._add_con(current_name, lhs, cons.sign, cons.rhs, disjunction_var=disjunction_var, mask=mask)
+                # save constraint doc
+                if isinstance(cons, lp.constraints.AnonymousScalarConstraint):
+                    index_list = []
+                else:
+                    index_list = list(cons.coords.dims)
+                self.docs[name] = self.compile_doc_string(doc, index_list, current_name)
+            else:
+                logging.warning(f"{name} already added. Can only be added once")
+
+    def add_constraint_rule(self, model: lp.Model, name, index_sets, rule, doc="", disjunction_var=None):
+        """ initialization of a variable
+        :param model: The linopy model
+        :param name: name of variable
+        :param index_sets: indices and sets by which the variable is indexed
+        :param rule: constraint rule
+        :param disjunction_var: An optional binary variable. The constraints will only be enforced if this variable is
+                                True
+        :param doc: docstring of variable"""
+
+
+        if name not in self.docs.keys():
+            index_values, index_list = self.get_index_names_data(index_sets)
+
+            # if the list of values is emtpy, there is nothing to add
+            if len(index_values) == 0:
+                return
+
+            # save constraint doc
+            self.docs[name] = self.compile_doc_string(doc, index_list, name)
+
+            # eval the rule
+            xr_lhs, xr_sign, xr_rhs = self.rule_to_cons(model=model, rule=rule, index_values=index_values, index_list=index_list)
+            self._add_con(name, xr_lhs, xr_sign, xr_rhs, disjunction_var=disjunction_var)
+        else:
+            logging.warning(f"{name} already added. Can only be added once")
+
+    def _get_M(self, model, lin_expr):
+        """
+        Calculates a conservative bound (max abs value) of the given linear expression
+        :param model: The model of the linear expression
+        :param lin_expr: The linear expression
+        :return: An array with the same shape as vars containing the bounds
+        """
+
+        # extract
+        vars = lin_expr.vars.data
+        coeffs = lin_expr.coeffs.data
+
+        # get the shape of the vars
+        shape = vars.shape
+
+        # get all the coords
+        bounds = []
+        for coeff, var in zip(coeffs.ravel(), vars.ravel()):
+            # if dummy, continue
+            if var == -1:
+                bounds.append(0)
+                continue
+
+            # get the name and coord
+            var_name, var_coord = model.variables.get_label_position(var)
+            lower = model.variables[var_name].lower.loc[var_coord].item()
+            upper = model.variables[var_name].upper.loc[var_coord].item()
+
+            # conservative bound
+            bounds.append(np.abs(coeff) * np.maximum(np.abs(lower), np.abs(upper)))
+
+        # sum over the _term dim and set coords
+        return xr.DataArray(np.sum(np.array(bounds).reshape(shape) + 1, axis=-1),
+                            coords=[lin_expr.vars.coords[d] for d in lin_expr.vars.dims[:-1]])
+
     def add_single_constraint(self, name, constraint):
         """ adds a single constraint to the model
-
         :param name: name of variable
         :param constraint: linopy constraint
         """
@@ -810,13 +916,14 @@ class Constraint(Component):
         mask = constraint.mask
         self._add_con(name, lhs, sign, rhs, mask=mask)
 
-    def _add_con(self, name, lhs, sign, rhs, mask=None):
+    def _add_con(self, name, lhs, sign, rhs, disjunction_var=None, mask=None):
         """ Adds a constraint to the model
-
         :param name: name of the constraint
         :param lhs: left hand side of the constraint
         :param sign: sign of the constraint
         :param rhs: right hand side of the constraint
+        :param disjunction_var: An optional binary variable. The constraints will only be enforced if this variable is
+                                True
         :param mask: An optional mask to only add the constraint for certain indices
         """
 
@@ -828,16 +935,102 @@ class Constraint(Component):
         # turn scalar masks into bool (otherwise it will use np.bool)
         if isinstance(mask,np.bool_):
             mask = bool(mask)
+        if disjunction_var is not None:
+            # get the bounds
+            bounds = self._get_M(self.model, lhs)
+            if not np.isfinite(bounds).all():
+                logging.warning(f"Constraint {name} has infinite bounds. Can not extract big-M resorting to default")
+                bounds = self.M
+
+            # if we have any equal cons, we need to transform them into <= and >=
+            if (sign == "=").any():
+                # the "<=" cons
+                sign_c = sign.where(sign != "=", "<=")
+                # todo fix this when fixed in xarray
+                m_arr = xr.zeros_like(rhs).where(
+                    (sign_c != "<=") & (sign_c != "<"), bounds
+                ).where(
+                    (sign_c != ">=") & (sign_c != ">"), -bounds)
+                self.model.add_constraints(lhs + m_arr * disjunction_var, sign_c, rhs + m_arr, name=name + "<=", mask=mask)
+                # the ">=" cons
+                sign_c = sign.where(sign != "=", ">=")
+                m_arr = xr.zeros_like(rhs).where(
+                    (sign_c != "<=") & (sign_c != "<"), bounds
+                ).where(
+                    (sign_c != ">=") & (sign_c != ">"), -bounds)
+                self.model.add_constraints(lhs + m_arr * disjunction_var, sign_c, rhs + m_arr, name=name + ">=", mask=mask)
+            # create the arr
+            else:
+                m_arr = xr.zeros_like(rhs).where(sign != "<=", bounds).where(sign != ">=", -bounds)
+                self.model.add_constraints(lhs + m_arr * disjunction_var, sign, rhs + m_arr, name=name + ">=", mask=mask)
         else:
             self.model.add_constraints(lhs, sign, rhs, name=name, mask=mask)
 
+    def rule_to_cons(self, model, rule, index_values, index_list, cons=None):
+        """
+        Evaluates the rule on the index_values
+        :param model: The linopy model
+        :param rule: The rule to call
+        :param index_values: A list of index_values to evaluate the rule
+        :param index_list: a list of index names
+        :param cons: A list of constraints, if the rule was already evaluated, if provided, the rule will not be called
+        :return: xarrays of the lhs, sign and the rhs
+        """
+
+        # create the mask
+        index_arrs = IndexSet.tuple_to_arr(index_values, index_list)
+        coords = [self.index_sets.get_coord(data, name) for data, name in zip(index_arrs, index_list)]
+
+        # there might be an extra label
+        if len(index_list) > 1 and len(index_list) != len(index_values[0]):
+            index_list = [f"dim_{i}" for i in range(len(index_values[0]))]
+        coords = xr.DataArray(coords=coords, dims=index_list).coords
+        shape = tuple(map(len, coords.values()))
+
+        # if we only have a single index, there is no need to unpack
+        if cons is None:
+            if len(index_list) == 1:
+                cons = [rule(arg) for arg in index_values]
+            else:
+                cons = [rule(*arg) for arg in index_values]
+
+        # catch Nones
+        placeholder_lhs = lp.expressions.ScalarLinearExpression((np.nan,), (-1,), model)
+        emtpy_cons = lp.constraints.AnonymousScalarConstraint(placeholder_lhs, "=", np.nan)
+        cons = [c if c is not None else emtpy_cons for c in cons]
+
+        # low level magic
+        exprs = [con.lhs for con in cons]
+        # complicated expressions might have been initialized with loc arrays
+        coeffs = np.array(tuple(zip_longest(*(e.coeffs.data if isinstance(e.coeffs, xr.DataArray) else e.coeffs for e in exprs), fillvalue=np.nan)))
+        vars = np.array(tuple(zip_longest(*(e.vars.data if isinstance(e.vars, xr.DataArray) else e.vars for e in exprs), fillvalue=-1)))
+
+        nterm = vars.shape[0]
+        coeffs = coeffs.reshape((nterm, -1))
+        vars = vars.reshape((nterm, -1))
+
+        xr_coeffs = xr.DataArray(np.full(shape=(nterm,) + shape, fill_value=np.nan), coords, dims=("_term", *coords))
+        xr_coeffs.loc[(slice(None), ) + index_arrs] = coeffs
+        xr_vars = xr.DataArray(np.full(shape=(nterm,) + shape, fill_value=-1), coords, dims=("_term", *coords))
+        xr_vars.loc[(slice(None), ) + index_arrs] = vars
+        xr_ds = xr.Dataset({"coeffs": xr_coeffs, "vars": xr_vars}).transpose(..., "_term")
+        xr_lhs = lp.LinearExpression(xr_ds, model)
+        xr_sign = xr.DataArray("=", coords, dims=index_list).astype("U2")
+        xr_sign.loc[index_arrs] = [c.sign.data if isinstance(c.sign, xr.DataArray) else c.sign for c in cons]
+        xr_rhs = xr.DataArray(0.0, coords, dims=index_list)
+        # Here we catch infinities in the constraints (gurobi does not care but glpk does)
+        rhs_vals = np.array([c.rhs.data if isinstance(c.rhs, xr.DataArray) else c.rhs for c in cons])
+        xr_rhs.loc[index_arrs] = rhs_vals
+
+        return xr_lhs, xr_sign, xr_rhs
+
     def add_pw_constraint(self, model, name, index_values, yvar, xvar, break_points, f_vals, cons_type="EQ"):
-        """Adds a piece-wise linear constraint of the type f(x) = y for each index in the index_values, where f is defined
+        """
+        Adds a piece-wise linear constraint of the type f(x) = y for each index in the index_values, where f is defined
         by the breakpoints and f_vals (x_1, y_1), ..., (x_n, y_n)
         Note that these method will create helper variables in form of a S0S2, sources:
          https://support.gurobi.com/hc/en-us/articles/360013421331-How-do-I-model-piecewise-linear-functions-
          https://medium.com/bcggamma/hands-on-modeling-non-linearity-in-linear-optimization-problems-f9da34c23c9a
-
         :param model: The model to add the constraints to
         :param name: The name of the constraint
         :param index_values: A list of index values that will be used to build the constraints
@@ -858,8 +1051,8 @@ class Constraint(Component):
         # cycle through all indices
         for num, index_val in enumerate(index_values):
             # extract everyting
-            x = xvar.at[index_val]
-            y = yvar.at[index_val]
+            x = xvar[index_val]
+            y = yvar[index_val]
             br = break_points[index_val]
             fv = f_vals[index_val]
             if len(br) != len(fv):
@@ -876,8 +1069,8 @@ class Constraint(Component):
             model.add_constraints(y.to_linexpr() - (fv * sos2_vars).sum() == 0, name=f"{name}_fv_{num}")
 
     def _get_nonnegative_sos2_vars(self, model, n):
-        """Creates a list of continues nonnegative variables in an SOS2
-
+        """
+        Creates a list of continues nonnegative variables in an SOS2
         :param model: The model to add the variables
         :param n: The number of variables to create
         :return: A list of variables that are SOS2 constrained
@@ -899,9 +1092,67 @@ class Constraint(Component):
 
         return sos2_var
 
-    def reorder_group(self, lhs, sign, rhs, index_values, index_names, model, drop=None):
-        """Reorders the constraints in a group to have full shape according to index values and names
+    def remove_constraint(self, model, name):
+        """
+        Removes a constraint from the model
+        :param model: The model to remove the constraint from
+        :param name: The name of the constraint
+        """
 
+        # remove all constraints and sub-constraints from the model and docs
+        for cname in list(model.constraints):
+            if cname.startswith(name):
+                model.constraints.remove(cname)
+        for cname in list(self.docs.keys()):
+            if cname.startswith(name):
+                del self.docs[cname]
+
+    @staticmethod
+    def combine_constraints(constraints, stack_dim, model):
+        """
+        Combines a list of constraints into a single constraint
+        :param constraints: A list of constraints
+        :param stack_dim: The name of the stack dimension
+        :param model: The model to add the constraints to
+        :return: A single constraint
+        """
+
+        # catch empty constraints
+        if len(constraints) == 0:
+            return constraints
+
+        # get the shape of the constraints
+        max_terms = max([c.lhs.shape[-1] if hasattr(c,"shape") else c.lhs.nterm for c in constraints])
+        c = constraints[0]
+        if hasattr(c,"shape"):
+            lhs_shape = c.lhs.shape[:-1] + (max_terms, )
+        else:
+            lhs_shape = (max_terms, )
+        coords = [xr.DataArray(np.arange(len(constraints)), dims=[stack_dim]), ] + [c.lhs.coords[d] for d in c.lhs.dims][:-1] + [xr.DataArray(np.arange(max_terms), dims=["_term"])]
+        coeffs = xr.DataArray(np.full((len(constraints), ) + lhs_shape, fill_value=np.nan), coords=coords,
+                              dims=(stack_dim, *constraints[0].lhs.dims))
+        variables = xr.DataArray(np.full((len(constraints), ) + lhs_shape, fill_value=-1), coords=coords,
+                                 dims=(stack_dim, *constraints[0].lhs.dims))
+        sign = xr.DataArray("=", coords=coords[:-1]).astype("U2")
+        rhs = xr.DataArray(np.nan, coords=coords[:-1])
+
+        for num, con in enumerate(constraints):
+            coeffs[num, ...,con.lhs.coeffs["_term"]] = con.lhs.coeffs.data
+            variables[num, ...,con.lhs.coeffs["_term"]] = con.lhs.vars.data
+            con_sign = xr.align(sign[num, ...],con.sign,join="left")[1]
+            sign[num, ...] = con_sign
+            con_rhs = xr.align(rhs[num, ...],con.rhs,join="left")[1]
+            rhs[num, ...] = con_rhs
+            # make sure all dims are in the right order and deal with subsets
+            rhs[num, ...] = rhs[num].where(~con_rhs.isnull(), con_rhs + rhs[num])
+
+        xr_ds = xr.Dataset({"coeffs": coeffs, "vars": variables, "sign": sign, "rhs": rhs})
+
+        return lp.constraints.Constraint(xr_ds, model)
+
+    def reorder_group(self, lhs, sign, rhs, index_values, index_names, model, drop=None):
+        """
+        Reorders the constraints in a group to have full shape according to index values and names
         :param lhs: The lhs of the constraints
         :param sign: The sign of the constraints, can be None if only lhs should be restructured
         :param rhs: The rhs of the constraints, can be None if only lhs should be restructured
@@ -954,3 +1205,127 @@ class Constraint(Component):
             # to full arrays
             xr_lhs = xr.Dataset({"coeffs": xr_coeffs, "vars": xr_vars,"sign": xr_sign, "rhs": xr_rhs})
             return lp.constraints.Constraint(xr_lhs,model)
+
+    def reorder_list(self, constraints, index_values, index_names, model):
+        """
+        Reorders a list of constraints to full shape according to index values and names
+        :param constraints: A list of constraints to reorder
+        :param index_values: List of index values corresponding to the group numbers
+        :param index_names: List of index names of the indices
+        :param model: The model
+        :return: A single constraint with the correct dimensions
+        """
+
+        # catch empty constraints
+        if len(constraints) == 0:
+            return []
+
+        # combine constraints to a group
+        combined_constraints = self.combine_constraints(constraints, "group", model)
+
+        # reorder the group
+        reordered = self.reorder_group(combined_constraints.lhs, combined_constraints.sign, combined_constraints.rhs, index_values, index_names, model)
+        return reordered
+
+    def align_constraint(self, constraint, mask=None):
+        """
+        Aligns a single constraint the coordinates
+        :param constraint: The constraint to align
+        :param mask: mask of constraint
+        :return: The aligned constraint and mask
+        """
+
+        # we start with the lhs
+        vars, _ = xr.align(constraint.lhs.data.vars, self.index_sets.coords_dataset, join="right", fill_value=-1)
+        coeffs, _ = xr.align(constraint.lhs.data.coeffs, self.index_sets.coords_dataset, join="right", fill_value=np.nan)
+
+        # now the rhs
+        rhs, _ = xr.align(constraint.rhs, self.index_sets.coords_dataset, join="right", fill_value=np.nan)
+
+        # sign
+        sign, _ = xr.align(constraint.sign, self.index_sets.coords_dataset, join="right", fill_value="=")
+
+        # mask
+        if mask is not None:
+            mask, _ = xr.align(mask, self.index_sets.coords_dataset, join="right", fill_value=False)
+
+        xr_ds = xr.Dataset({"coeffs": coeffs, "vars": vars, "sign": sign, "rhs": rhs})
+        return lp.constraints.Constraint(xr_ds,constraint.lhs.model), mask
+    
+    # def return_constraints(self, constraints, mask=None):
+    #     """ This is a high-level function that returns the constraints in the correct format, i.e. with reordering, masks,
+    #     etc.
+    #     :param constraints: A single constraints or a potentially empty list of constraints.
+    #     :param model: The model to which the constraints belong
+    #     :param mask: A mask with the same shape as the constraints
+    #     :param index_values: The index values corresponding to the group numbers, if reorder is necessary
+    #     :param index_names: The names of the indices, if reorder is necessary
+    #     :param stack_dim_name: If a list of constraints is provided along with index_values and index_names, the
+    #                            constraints are reordered with the provided indices, if a stack_dim_name is provided, the
+    #                            constraints are stacked along a single dimension with the provided name.
+    #     :return: Constraints with can be added
+    #     """
+    #     a=1
+        
+    def return_constraints(self, constraints, model=None, mask=None, index_values=None, index_names=None,
+                          stack_dim_name=None):
+        """
+        This is a high-level function that returns the constraints in the correct format, i.e. with reordering, masks,
+        etc.
+        :param constraints: A single constraints or a potentially empty list of constraints.
+        :param model: The model to which the constraints belong
+        :param mask: A mask with the same shape as the constraints
+        :param index_values: The index values corresponding to the group numbers, if reorder is necessary
+        :param index_names: The names of the indices, if reorder is necessary
+        :param stack_dim_name: If a list of constraints is provided along with index_values and index_names, the
+                               constraints are reordered with the provided indices, if a stack_dim_name is provided, the
+                               constraints are stacked along a single dimension with the provided name.
+        :return: Constraints with can be added
+        """
+
+        # nothing to do, this is the skip of a rule constraint
+        if constraints is None:
+            return constraints
+
+        if isinstance(constraints,list) and len(constraints) == 1 and isinstance(constraints[0], lp.constraints.AnonymousScalarConstraint):
+            constraints = constraints[0]
+        # no need to do anything special
+        if not isinstance(constraints, list):
+            # rule based constraints
+            if isinstance(constraints, lp.constraints.AnonymousScalarConstraint):
+                return constraints
+
+            # align
+            constraints, mask = self.align_constraint(constraints, mask)
+            if mask is None:
+                return constraints
+            return constraints, mask
+
+        # if there are no constraints, return an empty list
+        if len(constraints) == 0:
+            return []
+        elif model is None:
+            raise ValueError("If constraints is a list, model must be provided!")
+
+        # normal reordering
+        if index_names is not None and index_values is not None:
+            constraints = self.reorder_list(constraints, index_values, index_names, model)
+
+            # align
+            constraints, mask = self.align_constraint(constraints, mask)
+            if mask is None:
+                return constraints
+            return constraints, mask
+
+        # stack along a dimension
+        if stack_dim_name is not None:
+            constraints = self.combine_constraints(constraints, stack_dim_name, model)
+
+            # align
+            constraints, mask = self.align_constraint(constraints, mask)
+            if mask is None:
+                return constraints
+            return constraints, mask
+
+        # Error
+        raise ValueError("Either single constraint or a list with index_values and index_names or stack_dim_name must be provided!")

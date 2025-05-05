@@ -1,6 +1,11 @@
 """
-Class defining a standard EnergySystem.
-Contains methods to construct the energy system from the given input data and that defines the variables, parameters and constraints which apply to the Energy System. The class takes the abstract
+:Title:          ZEN-GARDEN
+:Created:        January-2022
+:Authors:        Jacob Mannhardt (jmannhardt@ethz.ch)
+:Organization:   Laboratory of Risk and Reliability Engineering, ETH Zurich
+
+Class defining a standard EnergySystem. Contains methods to add parameters, variables and constraints to the
+optimization problem. Parent class of the Carrier and Technology classes .The class takes the abstract
 optimization model as an input.
 """
 import copy
@@ -9,7 +14,6 @@ import logging
 import numpy as np
 import pandas as pd
 import xarray as xr
-from linopy import LinearExpression
 
 from zen_garden.model.objects.element import GenericRule,Element
 from zen_garden.preprocess.extract_input_data import DataInput
@@ -28,6 +32,7 @@ class EnergySystem:
         :param optimization_setup: The OptimizationSetup of the EnergySystem class"""
 
         # the name
+        self.set_regions = None
         self.name = "EnergySystem"
         self._name = "EnergySystem"
         # set attributes
@@ -53,7 +58,7 @@ class EnergySystem:
 
         # create UnitHandling object
         self.unit_handling = UnitHandling(self.input_path,
-                                          self.optimization_setup.solver.rounding_decimal_points_units)
+                                          self.optimization_setup.solver["rounding_decimal_points_units"])
 
         # create DataInput object
         self.data_input = DataInput(element=self, system=self.system,
@@ -61,7 +66,7 @@ class EnergySystem:
                                     energy_system=self, unit_handling=self.unit_handling)
         # initialize empty set_carriers list
         self.set_carriers = []
-        # dict to save the parameter units (and save them in the results later on)
+        #dict to save the parameter units (and save them in the results later on)
         self.units = {}
 
     def store_input_data(self):
@@ -72,32 +77,35 @@ class EnergySystem:
         self.set_nodes = self.data_input.extract_locations()
         self.set_nodes_on_edges = self.calculate_edges_from_nodes()
         self.set_edges = list(self.set_nodes_on_edges.keys())
+        #added regions.
+        self.set_regions = self.system["set_regions"]
         self.set_haversine_distances_edges = self.calculate_haversine_distances_from_nodes()
-        self.set_technologies = self.system.set_technologies
+        self.set_technologies = self.system["set_technologies"]
         # base time steps
-        self.set_base_time_steps = list(range(0, self.system.unaggregated_time_steps_per_year * self.system.optimized_years))
-        self.set_base_time_steps_yearly = list(range(0, self.system.unaggregated_time_steps_per_year))
+        self.set_base_time_steps = list(range(0, self.system["unaggregated_time_steps_per_year"] * self.system["optimized_years"]))
+        self.set_base_time_steps_yearly = list(range(0, self.system["unaggregated_time_steps_per_year"]))
 
         # yearly time steps
-        self.set_time_steps_yearly = list(range(self.system.optimized_years))
+        self.set_time_steps_yearly = list(range(self.system["optimized_years"]))
         self.set_time_steps_yearly_entire_horizon = copy.deepcopy(self.set_time_steps_yearly)
         time_steps_yearly_duration = self.time_steps.calculate_time_step_duration(self.set_time_steps_yearly, self.set_base_time_steps)
         self.sequence_time_steps_yearly = np.concatenate([[time_step] * time_steps_yearly_duration[time_step] for time_step in time_steps_yearly_duration])
         self.time_steps.sequence_time_steps_yearly = self.sequence_time_steps_yearly
         # list containing simulated years (needed for convert_real_to_generic_time_indices() in extract_input_data.py)
-        self.set_time_steps_years = list(range(self.system.reference_year, self.system.reference_year + self.system.optimized_years * self.system.interval_between_years, self.system.interval_between_years))
-        # parameters whose time-dependant data should not be interpolated (for years without data) in the extract_input_data.py convert_real_to_generic_time_indices() function
-        self.parameters_interpolation_off = self.data_input.read_input_json("parameters_interpolation_off")
+        self.set_time_steps_years = list(range(self.system["reference_year"],self.system["reference_year"] + self.system["optimized_years"]*self.system["interval_between_years"],self.system["interval_between_years"]))
+        # parameters whose time-dependant data should not be interpolated (for years without data) in the extract_input_data.py convertRealToGenericTimeIndices() function
+        self.parameters_interpolation_off = self.data_input.read_input_csv("parameters_interpolation_off")
         # technology-specific
-        self.set_conversion_technologies = self.system.set_conversion_technologies
-        self.set_transport_technologies = self.system.set_transport_technologies
-        self.set_storage_technologies = self.system.set_storage_technologies
-        self.set_retrofitting_technologies= self.system.set_retrofitting_technologies
+        self.set_conversion_technologies = self.system["set_conversion_technologies"]
+        self.set_transport_technologies = self.system["set_transport_technologies"]
+        self.set_storage_technologies = self.system["set_storage_technologies"]
+        self.set_retrofitting_technologies= self.system["set_retrofitting_technologies"]
+
         # discount rate
         self.discount_rate = self.data_input.extract_input_data("discount_rate", index_sets=[], unit_category={})
         # carbon emissions limit
         self.carbon_emissions_annual_limit = self.data_input.extract_input_data("carbon_emissions_annual_limit", index_sets=["set_time_steps_yearly"], time_steps="set_time_steps_yearly", unit_category={"emissions": 1})
-        _fraction_year = self.system.unaggregated_time_steps_per_year / self.system.total_hours_per_year
+        _fraction_year = self.system["unaggregated_time_steps_per_year"] / self.system["total_hours_per_year"]
         self.carbon_emissions_annual_limit = self.carbon_emissions_annual_limit * _fraction_year  # reduce to fraction of year
         self.carbon_emissions_budget = self.data_input.extract_input_data("carbon_emissions_budget", index_sets=[], unit_category={"emissions": 1})
         self.carbon_emissions_cumulative_existing = self.data_input.extract_input_data("carbon_emissions_cumulative_existing", index_sets=[], unit_category={"emissions": 1})
@@ -108,7 +116,6 @@ class EnergySystem:
         # market share unbounded
         self.market_share_unbounded = self.data_input.extract_input_data("market_share_unbounded", index_sets=[], unit_category={})
         # knowledge_spillover_rate
-        self.knowledge_depreciation_rate = self.data_input.extract_input_data("knowledge_depreciation_rate", index_sets=[], unit_category={})
         self.knowledge_spillover_rate = self.data_input.extract_input_data("knowledge_spillover_rate", index_sets=[], unit_category={})
 
     def calculate_edges_from_nodes(self):
@@ -132,8 +139,6 @@ class EnergySystem:
         set_haversine_distances_of_edges = {}
         # read coords file
         df_coords_input = self.data_input.extract_locations(extract_coordinates=True)
-        coords = df_coords_input.set_index("node")
-        self.system.coords = coords.T.to_dict()
         # convert coords from decimal degrees to radians
         df_coords_input["lon"] = df_coords_input["lon"] * np.pi / 180
         df_coords_input["lat"] = df_coords_input["lat"] * np.pi / 180
@@ -250,9 +255,7 @@ class EnergySystem:
         parameters.add_parameter(name="price_carbon_emissions_annual_overshoot", doc='Parameter which specifies the carbon price for annual overshoot', calling_class=cls)
         # carbon price of overshoot
         parameters.add_parameter(name="market_share_unbounded", doc='Parameter which specifies the unbounded market share', calling_class=cls)
-        # knowledge depreciation rate
-        parameters.add_parameter(name="knowledge_depreciation_rate", doc='Parameter which specifies the knowledge depreciation rate', calling_class=cls)
-        # knowledge spillover rate
+        # carbon price of overshoot
         parameters.add_parameter(name="knowledge_spillover_rate", doc='Parameter which specifies the knowledge spillover rate', calling_class=cls)
 
     def construct_vars(self):
@@ -280,6 +283,11 @@ class EnergySystem:
         # net_present_cost
         variables.add_variable(model, name="net_present_cost", index_sets=sets["set_time_steps_yearly"],
                                doc="net_present_cost of energy system", unit_category={"money": 1})
+        # Add variable to track regional costs
+        variables.add_variable(model, name="regional_cost_total",
+                               index_sets=sets["set_time_steps_yearly"],
+                               doc="Total cost for one region",
+                               unit_category={"money": 1})
 
     def construct_constraints(self):
         """ constructs the constraints of the class <EnergySystem> """
@@ -314,26 +322,34 @@ class EnergySystem:
         # disable annual carbon emissions overshoot
         self.rules.constraint_carbon_emissions_annual_overshoot()
 
+        # create the rules for regional minimal cost (for extra objective function)
+       #self.rules.constraint_regional_cost_total()
+
 
     def construct_objective(self):
         """ constructs the pe.Objective of the class <EnergySystem> """
         logging.info("Construct pe.Objective")
 
         # get selected objective rule
-        if self.optimization_setup.analysis.objective == "total_cost":
+        if self.optimization_setup.analysis["objective"] == "total_cost":
             objective = self.rules.objective_total_cost(self.optimization_setup.model)
-        elif self.optimization_setup.analysis.objective == "total_carbon_emissions":
+        elif self.optimization_setup.analysis["objective"] == "total_carbon_emissions":
             objective = self.rules.objective_total_carbon_emissions(self.optimization_setup.model)
+        elif self.optimization_setup.analysis["objective"] == "regional_minimum_cost":
+            objective = self.rules.objective_regional_minimum_cost(self.optimization_setup.model)
         else:
-            raise KeyError(f"Objective type {self.optimization_setup.analysis.objective} not known")
+            raise KeyError(f"Objective type {self.optimization_setup.analysis['objective']} not known")
 
         # get selected objective sense
-        sense = self.optimization_setup.analysis.sense
-        assert sense in ["min", "max"], f"Objective sense {sense} not known"
+        if self.optimization_setup.analysis["sense"] == "minimize":
+            logging.info("Using sense 'minimize'")
+        elif self.optimization_setup.analysis["sense"] == "maximize":
+            raise NotImplementedError("Currently only minimization supported")
+        else:
+            raise KeyError(f"Objective sense {self.optimization_setup.analysis['sense']} not known")
 
         # construct objective
-        self.optimization_setup.model.add_objective(objective,sense=sense)
-
+        self.optimization_setup.model.add_objective(objective.to_linexpr())
 
 class EnergySystemRules(GenericRule):
     """
@@ -349,18 +365,38 @@ class EnergySystemRules(GenericRule):
 
         super().__init__(optimization_setup)
 
+    def constraint_regional_cost_total(self, region_name="Europe"):
+        """Calculate total costs for a region"""
+        region_name = "rest"
+        region_nodes = self.optimization_setup.system["set_regions"][region_name]
+        # Get nodes in the specified region
+        print(f"Constructing regional cost constraint for {region_name}")
+        print(f"Found nodes for region {region_name}: {region_nodes}")
+
+        for tech in self.system["set_technologies"]:
+            # Calculate total cost for all nodes in the region
+            regional_cost = sum(
+                self.variables["cost_opex_yearly"].loc[tech,node]
+                for node in region_nodes) #
+
+            for capacity_type in self.optimization_setup.system["set_capacity_types"]:
+                regional_cost += sum(self.variables["cost_capex"].loc[tech,capacity_type, node] for node in region_nodes)
+
+                #    Set constraint: regional_cost_total equals sum of costs in the region
+        print(f"Computed regional cost for {region_name}: {regional_cost}")
+        lhs = self.variables["regional_cost_total"]
+        rhs = regional_cost
+        constraints =  lhs == rhs
+
+        self.constraints.add_constraint(f"constraint_regional_cost_total_{region_name}",constraints)
 
     def constraint_carbon_emissions_cumulative(self):
         """ cumulative carbon emissions over time
 
         .. math::
-            \\mathrm{First\\ planning\\ period}\\ y = y_0,\\quad E_y^\\mathrm{cum} = E_y
+            \mathrm{First\ planning\ period}\ y = y_0,\quad E_y^\mathrm{c} = E_y
         .. math::
-            \\mathrm{Subsequent\\ periods}\\ y > y_0, \\quad E_y^{cum} = E_{y-1}^{cum} + (dy-1)E_{y-1}+E_y
-
-        :math:`dy`: interval between planning periods \n
-        :math:`E_y`: annual carbon emissions in year :math:`y` \n
-        :math:`E_y^{cum}`: cumulative carbon emissions in year :math:`y`
+            \mathrm{Subsequent\ periods}\ y > y_0, \quad E_y^c = E_{y-1}^c + (\Delta^y-1)E_{y-1}+E_y
 
         """
 
@@ -369,7 +405,7 @@ class EnergySystemRules(GenericRule):
         lhs = (
                 self.variables["carbon_emissions_cumulative"]
                 - self.variables["carbon_emissions_cumulative"].shift(set_time_steps_yearly=1)
-                - self.variables["carbon_emissions_annual"].shift(set_time_steps_yearly=1) * (self.system.interval_between_years - 1)
+                - self.variables["carbon_emissions_annual"].shift(set_time_steps_yearly=1) * (self.system["interval_between_years"] - 1)
                 - self.variables["carbon_emissions_annual"]
         )
         rhs = (xr.ones_like(self.variables["carbon_emissions_cumulative"].mask) * self.parameters.carbon_emissions_cumulative_existing).where(m,0)
@@ -381,7 +417,7 @@ class EnergySystemRules(GenericRule):
         """ time dependent carbon emissions limit from technologies and carriers
 
         .. math::
-            E_y\\leq e_y
+            E_y\leq e_y
 
         """
 
@@ -396,13 +432,7 @@ class EnergySystemRules(GenericRule):
         The prediction extends until the end of the horizon, i.e.,
         last optimization time step plus the current carbon emissions until the end of the horizon
 
-        .. math::
-            E_y^\\mathrm{cum} + (dy-1)  E_y - E_y^\\mathrm{bo} \\leq e^b
-
-        :math:`E_y^\\mathrm{cum}`: cumulative carbon emissions of energy system in year :math:`y` \n
-        :math:`E_y`: annual carbon emissions of energy system in year :math:`y` \n
-        :math:`E_y^\\mathrm{bo}`: cumulative carbon emissions budget overshoot of energy system \n
-        :math:`e^b`: carbon emissions budget of energy system
+        #TODO constraint doesn't match model formulation definition
 
         """
 
@@ -411,7 +441,7 @@ class EnergySystemRules(GenericRule):
         lhs = (
                 self.variables["carbon_emissions_cumulative"]
                 - self.variables["carbon_emissions_budget_overshoot"]
-                + (self.variables["carbon_emissions_annual"].where(m) * (self.system.interval_between_years - 1))
+                + (self.variables["carbon_emissions_annual"].where(m) * (self.system["interval_between_years"] - 1))
         )
         rhs = self.parameters.carbon_emissions_budget
         constraints = lhs <= rhs
@@ -422,13 +452,8 @@ class EnergySystemRules(GenericRule):
         """ discounts the annual capital flows to calculate the net_present_cost
 
         .. math::
-            NPC_y = \\sum_{i \\in [0,dy(y))-1]} \\left( \\dfrac{1}{1+r} \\right)^{\\left(dy (y-y_0) + i \\right)} C_y
+            NPC_y = \sum_{i \in [0,dy(y))-1]} \\left( \dfrac{1}{1+r} \\right)^{\\left(dy (y-y_0) + i \\right)} C_y
 
-        :math:`NPC_y`: net present cost of energy system in year :math:`y` \n
-        :math:`C_y`: total cost of energy system in year :math:`y` \n
-        :math:`r`: discount rate \n
-        :math:`dy`: interval between planning periods \n
-        
        """
         factor = pd.Series(index = self.energy_system.set_time_steps_yearly)
         for year in self.energy_system.set_time_steps_yearly:
@@ -437,9 +462,9 @@ class EnergySystemRules(GenericRule):
             if year == self.energy_system.set_time_steps_yearly_entire_horizon[-1]:
                 interval_between_years = 1
             else:
-                interval_between_years = self.system.interval_between_years
+                interval_between_years = self.system["interval_between_years"]
             # economic discount
-            factor[year] = sum(((1 / (1 + self.parameters.discount_rate)) ** (self.system.interval_between_years * (year - self.energy_system.set_time_steps_yearly[0]) + _intermediate_time_step))
+            factor[year] = sum(((1 / (1 + self.parameters.discount_rate)) ** (self.system["interval_between_years"] * (year - self.energy_system.set_time_steps_yearly[0]) + _intermediate_time_step))
                          for _intermediate_time_step in range(0, interval_between_years))
         term_discounted_cost_total = self.variables["cost_total"] * factor
 
@@ -453,11 +478,7 @@ class EnergySystemRules(GenericRule):
         """ ensures carbon emissions overshoot of carbon budget is zero when carbon emissions price for budget overshoot is inf
 
         .. math::
-            \\mathrm{if } \\mu^{bo} =\\infty \\mathrm{,then: }E_y^\\mathrm{bo} = 0
-
-        :math:`E_y^\\mathrm{bo}`: overshoot carbon emissions of energy system at the end of the time horizon \n
-        :math:`\\mu^{bo}`: carbon price for budget overshoot
-
+            E_y^\mathrm{o} = 0
 
         """
 
@@ -474,10 +495,7 @@ class EnergySystemRules(GenericRule):
         """ ensures annual carbon emissions overshoot is zero when carbon emissions price for annual overshoot is inf
 
         .. math::
-            \\mathrm{if } \\mu^o =\\infty \\mathrm{,then: } E_y^\\mathrm{o} = 0
-
-        :math:`E_y^\\mathrm{o}`: overshoot of the annual carbon emissions limit of energy system \n
-        :math:`\\mu^o`: carbon price for annual overshoot
+            E_y^\mathrm{o}
 
         """
         no_price = self.parameters.price_carbon_emissions_annual_overshoot == np.inf
@@ -496,10 +514,7 @@ class EnergySystemRules(GenericRule):
         """ add up all carbon emissions from technologies and carriers
 
         .. math::
-            E_y = E_{y,\\mathcal{H}} + E_{y,\\mathcal{C}}
-
-        :math:`E_{y,\\mathcal{H}}`: carbon emissions from technologies in year :math:`y` \n
-        :math:`E_{y,\\mathcal{C}}`: carbon emissions from carriers in year :math
+            E_y = E_{y,\mathcal{H}} + E_{y,\mathcal{C}}
 
         """
 
@@ -515,13 +530,7 @@ class EnergySystemRules(GenericRule):
         """ carbon cost associated with the carbon emissions of the system in each year
 
         .. math::
-            OPEX_y^\\mathrm{c} = E_y\\mu + E_y^\\mathrm{o}\\mu^\\mathrm{o}
-
-        :math:`OPEX_y^\\mathrm{c}`: cost of carbon emissions in year :math:`y` \n
-        :math:`E_y`: annual carbon emissions of energy system in year :math:`y` \n
-        :math:`\\mu`: carbon price \n
-        :math:`E_y^\\mathrm{o}`: annual carbon emissions overshoot in year :math:`y` \n
-        :math:`\\mu^\\mathrm{o}`: carbon price for annual overshoot
+            OPEX_y^\mathrm{c} = E_y\mu + E_y^\mathrm{o}\mu^\mathrm{o}
 
         """
         mask_last_year = [year == self.energy_system.set_time_steps_yearly[-1] for year in self.energy_system.set_time_steps_yearly]
@@ -530,10 +539,10 @@ class EnergySystemRules(GenericRule):
                    - self.variables["carbon_emissions_annual"] * self.parameters.price_carbon_emissions)
         # add cost for overshooting carbon emissions budget
         if self.parameters.price_carbon_emissions_budget_overshoot != np.inf:
-            lhs -= self.variables["carbon_emissions_budget_overshoot"].where(mask_last_year) * self.parameters.price_carbon_emissions_budget_overshoot.item()
+            lhs -= self.variables["carbon_emissions_budget_overshoot"].where(mask_last_year) * self.parameters.price_carbon_emissions_budget_overshoot
         # add cost for overshooting annual carbon emissions limit
         if self.parameters.price_carbon_emissions_annual_overshoot != np.inf:
-            lhs -= self.variables["carbon_emissions_annual_overshoot"] * self.parameters.price_carbon_emissions_annual_overshoot.item()
+            lhs -= self.variables["carbon_emissions_annual_overshoot"] * self.parameters.price_carbon_emissions_annual_overshoot
 
         rhs = 0
         constraints = lhs == rhs
@@ -544,19 +553,13 @@ class EnergySystemRules(GenericRule):
         """ add up all costs from technologies and carriers
 
         .. math::
-            C_y = CAPEX_y + OPEX_y^\\mathrm{t} + OPEX_y^\\mathrm{c} + OPEX_y^\\mathrm{e}
-
-        :math:`C_y`: total cost of energy system in year :math:`y` \n
-        :math:`CAPEX_y`: annual capital expenditures in year :math:`y` \n
-        :math:`OPEX_y^\\mathrm{t}`: annual operational expenditures for operating technologies in year :math:`y` \n
-        :math:`OPEX_y^\\mathrm{c}`: annual operational expenditures for for importing and exporting carriers in year :math:`y` \n
-        :math:`OPEX_y^\\mathrm{e}`: annual operational expenditures for carbon emissions in year :math:`y`
+            OPEX_y^\mathrm{c} = E_y\mu + E_y^\mathrm{o}\mu^\mathrm{o}
 
         """
 
         lhs = (self.variables["cost_total"]
-               - self.variables["cost_capex_yearly_total"]
-               - self.variables["cost_opex_yearly_total"]
+               - self.variables["cost_capex_total"]
+               - self.variables["cost_opex_total"]
                - self.variables["cost_carrier_total"]
                - self.variables["cost_carbon_emissions_total"])
         rhs = 0
@@ -566,28 +569,30 @@ class EnergySystemRules(GenericRule):
 
     # Objective rules
     # ---------------
+    # In EnergySystemRules class
+    def objective_regional_minimum_cost(self, model):
+        """Objective function to minimize costs for a specific region"""
+        return sum([model.variables["regional_cost_total"][year] for year in self.energy_system.set_time_steps_yearly])
 
     def objective_total_cost(self, model):
         """objective function to minimize the total net present cost
 
         .. math::
-            J = \\sum_{y\\in\\mathcal{Y}} NPC_y
+            J = \sum_{y\in\mathcal{Y}} NPC_y
 
         :param model: optimization model
         :return: net present cost objective function
         """
-        return model.variables["net_present_cost"].sum("set_time_steps_yearly")
+        return sum([model.variables["net_present_cost"][year] for year in self.energy_system.set_time_steps_yearly])
 
     def objective_total_carbon_emissions(self, model):
         """objective function to minimize total emissions
 
         .. math::
-            J = E^{\\mathrm{cum}}_Y
-
-        :math:`E^{\\mathrm{cum}}_Y`: cumulative carbon emissions at the end of the time horizon
+            J = \sum_{y\in\mathcal{Y}} E_y
 
         :param model: optimization model
         :return: total carbon emissions objective function
         """
         sets = self.sets
-        return model.variables["carbon_emissions_cumulative"][sets["set_time_steps_yearly"][-1]].to_linexpr()
+        return model.variables["carbon_emissions_cumulative"][sets["set_time_steps_yearly"][-1]]

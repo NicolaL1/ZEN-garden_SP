@@ -1,6 +1,3 @@
-"""
-File that contains functions to compare the results of two or more models.
-"""
 from zen_garden.postprocess.results import Results
 from zen_garden.postprocess.results.solution_loader import ComponentType
 from typing import Optional, Any
@@ -19,7 +16,6 @@ def compare_model_values(
     """Compares the input data of two or more results
 
     :param results: list of results
-    :param component_type: component type to compare
     :param compare_total: if True, compare total value, not full time series
     :param scenarios: None, str or tuple of scenarios
     :return: a dictionary with diverging results
@@ -62,9 +58,9 @@ def compare_configs(
     """
     Compares the configs of two results, namely the Analysis-Config and the System-config.
 
-    :param results: List of results
-    :param scenario_name: List of scenarios to filter by
-    :return: dictionary with diverging configs
+    :param results_1: Results
+    :param results_2: Other results
+    :param scnearios: List of scenarios to filter by
     """
     ans: dict[str, Any] = {}
 
@@ -114,8 +110,7 @@ def get_component_diff(
 ) -> list[str]:
     """returns a list with the differences in component names
 
-    :param results: list with results
-    :param component_type: component type to compare
+    :param results: dictionary with results
     :return: list with the common params
     """
     assert len(results) == 2, "Please give exactly two components"
@@ -193,9 +188,9 @@ def check_and_fill_scenario_list(
 ) -> list[str]:
     """Checks if both results have the provided scenarios and otherwise returns a list containing twice one common scenario.
 
-    :param results: List of results.
+    :param results_1: Result 1
+    :param results_2: Result 2
     :param scenarios: List of names of scenario.
-    :return: List of scenario names
     """
     assert len(results) == 2, "Please provide exactly two results"
     assert len(scenarios) <= 2, "Please provide a maximum of two scenarios"
@@ -234,7 +229,6 @@ def get_common_scenario(results_1: Results, results_2: Results) -> str:
 
     :param results_1: Results 1
     :param results_2: Results 2
-    :return: Name of common scenario
     """
     common_scenarios = set(results_1.solution_loader.scenarios.keys()).intersection(
         results_2.solution_loader.scenarios.keys()
@@ -254,7 +248,7 @@ def compare_component_values(
     """Compares component values of two results
 
     :param results: list with results
-    :param component_name: component name
+    :param component: component name
     :param compare_total: if True, compare total value, not full time series
     :param scenarios: None, str or tuple of scenarios
     :param rtol: relative tolerance of equal values
@@ -273,17 +267,7 @@ def compare_component_values(
     else:
         val_0 = results_0.get_full_ts(component_name, scenario_name=scenario_0)
         val_1 = results_1.get_full_ts(component_name, scenario_name=scenario_1)
-    return _get_comparison_df(val_0, val_1, result_names, component_name, rtol)
 
-def _get_comparison_df(val_0, val_1, result_names, component_name, rtol):
-    """
-    :param val_0:
-    :param val_1:
-    :param result_names:
-    :param component_name:
-    :param rtol:
-    :return:
-    """
     mismatched_index = False
     mismatched_shape = False
     if isinstance(val_0, pd.DataFrame):
@@ -304,7 +288,7 @@ def _get_comparison_df(val_0, val_1, result_names, component_name, rtol):
             mismatched_index = True
     else:
         logging.info(
-            f"Component {component_name} changed shape from {val_0.shape} ({result_names[0]}) to {val_1.shape} ({result_names[1]})"
+            f"Component {component_name} changed shape from {val_0.shape} ({results_0.solution_loader.name}) to {val_1.shape} ({results_0.solution_loader.name})"
         )
         mismatched_shape = True
         if not val_0.index.equals(val_1.index):
@@ -314,15 +298,8 @@ def _get_comparison_df(val_0, val_1, result_names, component_name, rtol):
         logging.info(
             f"Component {component_name} does not have matching index or columns"
         )
-        missing_index = val_0.index.difference(val_1.index) if len(val_0.index) > len(val_1.index) else val_1.index.difference(val_0.index)
-        common_index = val_0.index.intersection(val_1.index)
-        val_0_aligned = val_0.loc[common_index]
-        val_1_aligned = val_1.loc[common_index]
-        comparison_df_aligned = _get_different_vals(val_0_aligned, val_1_aligned, result_names, rtol)
-        wrong_index = comparison_df_aligned.index.union(missing_index)
         comparison_df = pd.concat([val_0, val_1], keys=result_names, axis=1)
         comparison_df = comparison_df.sort_index(axis=1, level=1)
-        comparison_df = comparison_df.loc[wrong_index]
         return comparison_df
     # if not mismatched_shape:
     if not mismatched_shape:
@@ -351,8 +328,6 @@ def _get_different_vals(
     
     :param val_0: first dataframe or series
     :param val_1: second dataframe or series
-    :param result_names: names of the results
-    :param rtol: relative tolerance of equal values
     :return: comparison_df
     """
     is_close = np.isclose(val_0, val_1, rtol=rtol, equal_nan=True)

@@ -1,5 +1,10 @@
 """
-File which contains the unit handling and scaling class.
+:Title:          ZEN-GARDEN
+:Created:        April-2022
+:Authors:        Jacob Mannhardt (jmannhardt@ethz.ch)
+:Organization:   Laboratory of Reliability and Risk Engineering, ETH Zurich
+
+Class containing the unit handling procedure.
 """
 import cProfile
 import logging
@@ -11,7 +16,6 @@ import json
 import os
 import linopy as lp
 import re
-import itertools
 from pint import UnitRegistry
 from pint.util import column_echelon_form
 from pathlib import Path
@@ -111,13 +115,7 @@ class UnitHandling:
         """ extracts base units of energy system
 
         :return list_base_units: list of base units """
-        if os.path.exists(os.path.join(self.folder_path / "base_units.csv")):
-            list_base_units = pd.read_csv(self.folder_path / "base_units.csv").squeeze().values.tolist()
-            logging.warning("DeprecationWarning: Specifying the base units in .csv file format is deprecated. Use a .json file format instead.")
-        else:
-            with open(os.path.join(self.folder_path, 'base_units.json'), "r") as f:
-                data = json.load(f)
-            list_base_units = data['unit']
+        list_base_units = pd.read_csv(self.folder_path / "base_units.csv").squeeze().values.tolist()
         return list_base_units
 
     def calculate_combined_unit(self, input_unit, return_combination=False):
@@ -170,11 +168,10 @@ class UnitHandling:
         else:
             return combined_unit
 
-    def _get_combined_unit_of_different_matrix(self, dim_matrix_reduced, dim_vector, input_unit):
+    def _get_combined_unit_of_different_matrix(self,dim_matrix_reduced,dim_vector,input_unit):
         """ calculates the combined unit for a different dimensionality matrix.
         We substitute base units by the dependent units and try again.
         If the matrix is singular we solve the overdetermined problem
-
         :param dim_matrix_reduced: dimensionality matrix without dependent units
         :param dim_vector: dimensionality vector of input unit
         :param input_unit: input unit
@@ -185,54 +182,56 @@ class UnitHandling:
         combined_unit = self.ureg(input_unit).units
         base_combination = pd.Series(index=self.dim_matrix.columns, data=0)
         # try to substitute unit by a dependent unit
-        for unit_combination in itertools.combinations(self.dim_matrix.columns, len(self.dim_matrix.index)):
-            if not calculated_multiplier and len(set(unit_combination).difference(set(dim_matrix_reduced.columns))) != 0:
-                # use reduced matrix based on the unit_combination
-                dim_matrix_reduced_temp = self.dim_matrix.loc[:, unit_combination]
-                # if full rank
-                if np.linalg.matrix_rank(dim_matrix_reduced_temp) == np.size(dim_matrix_reduced_temp, 1):
-                    combination_solution_temp = np.linalg.solve(dim_matrix_reduced_temp, dim_vector)
-                # if singular, check if zero row in matrix corresponds to zero row in unit dimensionality
-                else:
-                    zero_row = dim_matrix_reduced_temp.index[~dim_matrix_reduced_temp.any(axis=1)]
-                    if (dim_vector[zero_row] == 0).all():
-                        # remove zero row
-                        dim_matrix_reduced_temp_reduced = dim_matrix_reduced_temp.drop(zero_row, axis=0)
-                        dim_vector_reduced = dim_vector.drop(zero_row, axis=0)
-                        # formulate as optimization problem with 1,-1 bounds
-                        # to determine solution of overdetermined matrix
-                        ub = np.array([1] * len(dim_matrix_reduced_temp_reduced.columns))
-                        lb = np.array([-1] * len(dim_matrix_reduced_temp_reduced.columns))
-                        res = sp.optimize.lsq_linear(
-                            dim_matrix_reduced_temp_reduced, dim_vector_reduced,
-                            bounds=(lb, ub))
-                        # if an exact solution is found (after rounding)
-                        if np.round(res.cost, 4) == 0:
-                            combination_solution_temp = np.round(res.x, 4)
-                        # if not solution is found
+        for unit in dim_matrix_reduced.columns:
+            if not calculated_multiplier:
+                # iterate through dependent units
+                for dependent_unit, dependent_dim in zip(self.dim_analysis["dependent_units"],
+                                                         self.dim_analysis["dependent_dims"]):
+                    # substitute current unit with dependent unit
+                    dim_matrix_reduced_temp = dim_matrix_reduced.drop(unit, axis=1)
+                    dim_matrix_reduced_temp[dependent_unit] = self.dim_matrix[dependent_unit]
+                    # if full rank
+                    if np.linalg.matrix_rank == np.size(dim_matrix_reduced_temp, 1):
+                        combination_solution_temp = np.linalg.solve(dim_matrix_reduced_temp, dim_vector)
+                    # if singular, check if zero row in matrix corresponds to zero row in unit dimensionality
+                    else:
+                        zero_row = dim_matrix_reduced_temp.index[~dim_matrix_reduced_temp.any(axis=1)]
+                        if (dim_vector[zero_row] == 0).all():
+                            # remove zero row
+                            dim_matrix_reduced_temp_reduced = dim_matrix_reduced_temp.drop(zero_row, axis=0)
+                            dim_vector_reduced = dim_vector.drop(zero_row, axis=0)
+                            # formulate as optimization problem with 1,-1 bounds
+                            # to determine solution of overdetermined matrix
+                            ub = np.array([1] * len(dim_matrix_reduced_temp_reduced.columns))
+                            lb = np.array([-1] * len(dim_matrix_reduced_temp_reduced.columns))
+                            res = sp.optimize.lsq_linear(
+                                dim_matrix_reduced_temp_reduced, dim_vector_reduced,
+                                bounds=(lb, ub))
+                            # if an exact solution is found (after rounding)
+                            if np.round(res.cost, 4) == 0:
+                                combination_solution_temp = np.round(res.x, 4)
+                            # if not solution is found
+                            else:
+                                continue
+                        # definitely not a solution because zero row corresponds to nonzero dimensionality
                         else:
                             continue
-                    # definitely not a solution because zero row corresponds to nonzero dimensionality
-                    else:
-                        continue
-                if UnitHandling.check_pos_neg_boolean(combination_solution_temp):
-                    # compose relevant units to dimensionless combined unit
-                    base_combination[dim_matrix_reduced_temp.columns] = combination_solution_temp
-                    for unit_temp, power_temp in zip(dim_matrix_reduced_temp.columns, combination_solution_temp):
-                        combined_unit *= self.ureg(unit_temp) ** (-1 * power_temp)
-                    calculated_multiplier = True
-                    break
+                    if UnitHandling.check_pos_neg_boolean(combination_solution_temp):
+                        # compose relevant units to dimensionless combined unit
+                        base_combination[dim_matrix_reduced_temp.columns] = combination_solution_temp
+                        for unit_temp, power_temp in zip(dim_matrix_reduced_temp.columns, combination_solution_temp):
+                            combined_unit *= self.ureg(unit_temp) ** (-1 * power_temp)
+                        calculated_multiplier = True
+                        break
         assert calculated_multiplier, f"Cannot establish base unit conversion for {input_unit} from base units {self.base_units.keys()}"
         return base_combination,combined_unit
 
-    #ToDo: check if combined_unit is described correctly in the header
     def get_unit_multiplier(self, input_unit, attribute_name, path=None, combined_unit=None):
         """ calculates the multiplier for converting an input_unit to the base units
 
         :param input_unit: string of input unit
         :param attribute_name: name of attribute
         :param path: path of element
-        :param combined_unit: input unit expressed in base units
         :return multiplier: multiplication factor """
         # if input unit is already in base units --> the input unit is base unit, multiplier = 1
         if input_unit in self.base_units:
@@ -285,7 +284,7 @@ class UnitHandling:
 
         :param optimization_setup: OptimizationSetup object
         """
-        if not optimization_setup.solver.check_unit_consistency:
+        if not optimization_setup.solver["check_unit_consistency"]:
             return
         elements = optimization_setup.dict_elements["Element"]
         items = elements + [optimization_setup.energy_system]
@@ -338,39 +337,36 @@ class UnitHandling:
                 elif attribute_name not in ["input_carrier", "output_carrier", "reference_carrier"]:
                     energy_quantity_units.update(self._remove_non_energy_units(unit_specs, attribute_name))
             # remove attributes whose units became dimensionless since they don't have an energy quantity
-            energy_quantity_units_check = {key: value.to_base_units().units for key, value in energy_quantity_units.items() if value.to_base_units().units != self.ureg("dimensionless")}
             energy_quantity_units = {key: value for key, value in energy_quantity_units.items() if value != self.ureg("dimensionless")}
             # check if conversion factor units are consistent
-            self._check_for_power_power(energy_quantity_units, energy_quantity_units_check)
+            self._check_for_power_power_conversion_factor(energy_quantity_units)
             # check if units are consistent
-            self.assert_unit_consistency(elements, energy_quantity_units, energy_quantity_units_check, item, optimization_setup, reference_carrier.name, unit_dict)
+            self.assert_unit_consistency(elements, energy_quantity_units, item,optimization_setup, reference_carrier.name, unit_dict)
         logging.info(f"Parameter unit consistency is fulfilled!")
         self.save_carrier_energy_quantities(optimization_setup)
 
-    def _check_for_power_power(self, energy_quantity_units, energy_quantity_units_check):
-        """if unit consistency is not fulfilled because of conversion factor or retrofit_flow_coupling_factor,
-        try to change "wrong" conversion factor or retrofit_flow_coupling_factor units from power/power to energy/energy (since both is allowed)
-
-        :param energy_quantity_units: dict containing attribute names and their energy quantity units
-        :param energy_quantity_units_check: dict containing the energy quantity terms in base units for checking consistency
+    def _check_for_power_power_conversion_factor(self, energy_quantity_units):
         """
-        exclude_strings = ["conversion_factor", "retrofit_flow_coupling_factor"]
-        if self._is_inconsistent(energy_quantity_units_check) and not self._is_inconsistent(energy_quantity_units_check, exclude_strings=exclude_strings):
-            non_cf_energy_quantity_unit = [value for key, value in energy_quantity_units.items() if all(es not in key for es in exclude_strings)][0]
-            cf_energy_quantity_units = {key: value for key, value in energy_quantity_units.items() if any(es in key for es in exclude_strings)}
+        if unit consistency is not fulfilled because of conversion factor, try to change "wrong" conversion factor units from power/power to energy/energy (since both is allowed)
+        :param energy_quantity_units:
+        :return:
+        """
+        if self._is_inconsistent(energy_quantity_units) and not self._is_inconsistent(energy_quantity_units,
+                                                                                      exclude_string="conversion_factor"):
+            non_cf_energy_quantity_unit = \
+            [value for key, value in energy_quantity_units.items() if "conversion_factor" not in key][0]
+            cf_energy_quantity_units = {key: value for key, value in energy_quantity_units.items() if
+                                        "conversion_factor" in key}
             time_base_unit = [key for key, value in self.base_units.items() if value == "[time]"][0]
             for key, value in cf_energy_quantity_units.items():
                 # if conversion factor unit is in not in energy units, try to convert it to energy units by multiplying with time base unit
                 if value != non_cf_energy_quantity_unit:
                     energy_quantity_units[key] = value * self.ureg(time_base_unit)
-                    energy_quantity_units_check[key] = energy_quantity_units_check[key] * self.ureg(time_base_unit).to_base_units().units
 
-    def assert_unit_consistency(self, elements, energy_quantity_units, energy_quantity_units_check, item, optimization_setup, reference_carrier_name, unit_dict):
+    def assert_unit_consistency(self, elements, energy_quantity_units, item,optimization_setup, reference_carrier_name, unit_dict):
         """Asserts that the units of the attributes of an element are consistent
-
         :param elements: list of all elements
         :param energy_quantity_units: dict containing attribute names and their energy quantity terms
-        :param energy_quantity_units_check: dict containing the energy quantity terms in base units for checking consistency
         :param item: element or energy system
         :param optimization_setup: OptimizationSetup object
         :param reference_carrier_name: name of reference carrier if item is a conversion technology
@@ -378,7 +374,7 @@ class UnitHandling:
         """
         attributes_with_lowest_appearance = self._get_attributes_with_least_often_appearing_unit(energy_quantity_units)
         # assert unit consistency
-        if item in elements and self._is_inconsistent(energy_quantity_units_check):
+        if item in elements and self._is_inconsistent(energy_quantity_units):
             # check if there is a conversion factor with wrong units
             wrong_cf_atts = {att: unit for att, unit in attributes_with_lowest_appearance.items() if
                              "conversion_factor" in att}
@@ -415,22 +411,22 @@ class UnitHandling:
                 raise AssertionError(
                     f"The attribute units of the {item.__class__.__name__} {item.name} and its reference carrier {reference_carrier_name} are not consistent! Most propably, the unit(s) of the attribute(s) {self._get_units_of_wrong_attributes(wrong_atts=attributes_with_lowest_appearance, unit_dict=unit_dict)} are wrong.")
         # since energy system doesn't have any attributes with energy dimension, its dict must be empty
-        elif item not in elements and len(energy_quantity_units_check) != 0:
+        elif item not in elements and len(energy_quantity_units) != 0:
             self._write_inconsistent_units_file(energy_quantity_units, item.name, analysis=optimization_setup.analysis)
             raise AssertionError(
                 f"The attribute units defined in the energy_system are not consistent! Most probably, the unit(s) of the attribute(s) {self._get_units_of_wrong_attributes(wrong_atts=energy_quantity_units, unit_dict=unit_dict)} are wrong.")
 
-    def _is_inconsistent(self, energy_quantity_units,exclude_strings=None):
-        """Checks if the units of the attributes of an element are inconsistent
-
+    def _is_inconsistent(self, energy_quantity_units,exclude_string=None):
+        """
+        Checks if the units of the attributes of an element are inconsistent
         :param energy_quantity_units: dict containing attribute names and their energy quantity terms
-        :param exclude_strings: string for which consistency is not checked
+        :param exclude_string: string for which consistency is not checked
         :return: bool whether the units are consistent or not
         """
         # exclude attributes which are not of interest for consistency
-        if exclude_strings:
-            energy_quantity_units = {key: value for key, value in energy_quantity_units.items() if all(es not in key for es in exclude_strings)}
-        # check if all energy quantity units are the sames
+        if exclude_string:
+            energy_quantity_units = {key: value for key, value in energy_quantity_units.items() if exclude_string not in key}
+        # check if all energy quantity units are the same
         if len(set(energy_quantity_units.values())) > 1:
             return True
         else:
@@ -457,7 +453,7 @@ class UnitHandling:
         :param reference_carrier_name: name of reference carrier if item is a conversion technology
         """
         inconsistent_attributes_dict = {"element_name": item_name, "reference_carrier": reference_carrier_name, "attribute_names": str(inconsistent_attributes.keys())}
-        directory = os.path.join(analysis.folder_output, os.path.basename(analysis.dataset))
+        directory = os.path.join(analysis["folder_output"], os.path.basename(analysis["dataset"]))
         if not os.path.exists(directory):
             os.makedirs(directory)
         path = os.path.join(directory, "inconsistent_units.json")
@@ -514,8 +510,8 @@ class UnitHandling:
             correct_unit_string = [("*" in u and u[0] == "(" and u[1] == ")") or ("*" not in u) for u in units]
             assert all(correct_unit_string), f"The conversion factor string(s) {[u for u,s in zip(units,correct_unit_string) if not s]} of technology {conversion_element.name} must not contain an asterisk '*' unless it is enclosed in parentheses '()'"
 
-            # problem: we don't know which parts of cf unit belong to which carrier for units of format different from "unit/unit" (e.g. kg/h/kW)
-            # method: compare number of division signs of conversion factor unit with number of division signs of corresponding carrier element energy/power quantity
+            #problem: we don't know which parts of cf unit belong to which carrier for units of format different from "unit/unit" (e.g. kg/h/kW)
+            #method: compare number of division signs of conversion factor unit with number  of division signs of corresponding carrier element energy/power quantity
             dependent_carrier = [carrier for carrier in elements if carrier.name == dependent_carrier_name][0]
 
             div_signs_dependent_carrier_energy = self._get_number_of_division_signs_energy_quantity(dependent_carrier.units)
@@ -526,28 +522,28 @@ class UnitHandling:
             div_signs_ref_carrier_power = self._get_number_of_division_signs_energy_quantity(reference_carrier.units, power=True)
             number_of_division_signs_power = div_signs_ref_carrier_power + div_signs_dependent_carrier_power
 
-            # conversion factor unit must be defined as energy/energy or power/power in the corresponding carrier energy quantity units
-            # Check if the conversion factor is defined as energy/energy
+            #conversion factor unit must be defined as energy/energy or power/power in the corresponding carrier energy quantity units
+            #Check if the conversion factor is defined as energy/energy
             factor_units = {}
             if len(units) - 2 == number_of_division_signs_energy:
-                # assign the unit parts to the corresponding carriers
+                #assign the unit parts to the corresponding carriers
                 factor_units[dependent_carrier_name] = units[0:div_signs_dependent_carrier_energy + 1]
                 factor_units[reference_carrier.name] = units[div_signs_dependent_carrier_energy + 1:]
-            # check if the conversion factor is defined as power/power
+            #check if the conversion factor is defined as power/power
             elif len(units) - 2 == number_of_division_signs_power:
-                # assign the unit parts to the corresponding carriers
+                #assign the unit parts to the corresponding carriers
                 factor_units[dependent_carrier_name] = units[0:div_signs_dependent_carrier_power + 1]
                 factor_units[reference_carrier.name] = units[div_signs_dependent_carrier_power + 1:]
             else:
                 raise AssertionError(f"The conversion factor units of technology {conversion_element.name} must be defined as power/power or energy/energy of input/output carrier divided by reference carrier, e.g. MW/MW, MW/kg/s or GWh/GWh, kg/MWh etc.")
-            # recombine the separated units carrier-wise to the initial fraction
+            #recombine the separated units carrier-wise to the initial fraction
             for key, value in factor_units.items():
                 factor_units[key] = "/".join(value)
             conversion_factor_units[dependent_carrier_name] = factor_units
         return conversion_factor_units
 
     def _get_number_of_division_signs_energy_quantity(self, carrier_units, power=False):
-        """ Finds the most common energy quantity of a carrier and counts its number of division signs (or the number of division signs of the resulting power unit)
+        """Finds the most common energy quantity of a carrier and counts its number of division signs (or the number of division signs of the resulting power unit)
 
         :param carrier_units: unit attribute of the underlying carrier element
         :param power: bool to get the number of division signs of the most common power quantity (energy quantity divided by time)
@@ -627,6 +623,64 @@ class UnitHandling:
         if attribute in self.dict_attribute_values.keys():
             self.dict_attribute_values[attribute]["values"] = df_output
 
+    def recommend_base_units(self, immutable_unit, unit_exps):
+        """ gets the best base units based on the input parameter values
+
+        :param immutable_unit: base units which must not be changed to recommend a better set of base units
+        :param unit_exps: exponent range inbetween which the base units can be scaled by 10^exponent
+        """
+        logging.info(f"Check for best base unit combination between 10^{unit_exps['min']} and 10^{unit_exps['max']}")
+        dict_values = {}
+        dict_units = {}
+        base_units = self.dim_matrix.columns.copy()
+        for item in self.dict_attribute_values:
+            if self.dict_attribute_values[item]["values"] is not None:
+                _df_values_temp = self.dict_attribute_values[item]["values"].reset_index(drop=True)
+                _df_units_temp = pd.DataFrame(index=_df_values_temp.index, columns=base_units)
+                _df_units_temp.loc[_df_values_temp.index, :] = self.dict_attribute_values[item]["base_combination"][base_units].values
+                dict_values[item] = _df_values_temp
+                dict_units[item] = _df_units_temp
+        df_values = pd.concat(dict_values, ignore_index=True).abs()
+        df_units = pd.concat(dict_units, ignore_index=True)
+        mutable_unit = self.dim_matrix.columns[self.dim_matrix.columns.isin(base_units.difference(immutable_unit))]
+        df_units = df_units.loc[:, mutable_unit].values
+
+        # remove rows of df_units which contain only zeros since they cannot be scaled anyway and may influence minimization convergence
+        zero_rows_mask = np.all(df_units == 0, axis=1)
+        A = df_units[~zero_rows_mask]
+        b = df_values[~zero_rows_mask]
+
+        def fun_LSE(x):
+            """
+            function to compute the least square error of the individual coefficients compared to their mean value
+
+            :param x: array of exponents the coefficients get scaled with (b_tilde = b * 10^(A*x))
+            :return: square error evaluated at x
+            """
+            b_tilde_log = np.log10(b) - np.dot(A, x)
+            b_avg = b.sum() / b.size
+            return ((b_tilde_log - np.log10(b_avg)) ** 2).sum()
+
+        x0 = np.ones(A.shape[1])
+        result = sp.optimize.minimize(fun_LSE, x0, method='L-BFGS-B', bounds=[(unit_exps["min"], unit_exps["max"]) for i in range(df_units.shape[1])])
+
+        if not result.success:
+            logging.info(f"Minimization for better base units was not successful, initial base units will therefore be used.")
+
+        #cast solution array to integers since base units should be scaled by factors of 10, 100, etc.
+        x_int = result.x.astype(int)
+
+        lse_initial_base_units = fun_LSE(np.zeros(df_units.shape[1]))
+        lse = fun_LSE(x_int)
+        if lse >= lse_initial_base_units:
+            logging.info("The current base unit setting is the best in the given search interval")
+        else:
+            list_units = []
+            for exp, unit in zip(x_int, mutable_unit):
+                if exp != 0:
+                    list_units.append(str(self.ureg(f"{10.0 ** exp} {unit}").to_compact()))
+            logging.info(f"A better base unit combination is {', '.join(list_units)}. This reduces the square error of the coefficients compared to their mean by {'{:e}'.format(lse_initial_base_units-lse)}")
+
     def check_if_invalid_hourstring(self, input_unit):
         """
         checks if "h" and thus "planck_constant" in input_unit
@@ -668,13 +722,6 @@ class Scaling:
     This class scales the optimization model before solving it and rescales the solution
     """
     def __init__(self, model, algorithm=None, include_rhs = True):
-        """ initializes scaling instance
-
-        :param model: optimization model
-        :param algorithm: list of scaling algorithms
-        :param include_rhs: bool whether to include the right hand side in the scaling
-
-        """
         #optimization model to perform scaling on
         if algorithm is None:
             algorithm = ["geom"]
@@ -691,10 +738,6 @@ class Scaling:
         self.scaling_time = 0
 
     def initiate_A_matrix(self):
-        """
-        Constructs the A matrix and the right hand side of the constraints
-
-        """
         self.A_matrix = self.model.constraints.to_matrix(filter_missings=False)
         self.A_matrix_copy = self.A_matrix.copy() #necessary for printing of numerics
         self.D_r_inv = np.ones(self.A_matrix.get_shape()[0])
@@ -713,9 +756,6 @@ class Scaling:
         self.rhs_copy = self.rhs.copy() #necessary for printing of numerics
 
     def re_scale(self):
-        """
-        Rescales the solution of the optimization model
-        """
         model = self.model
         for name_var in model.variables:
             var = model.variables[name_var]
@@ -723,18 +763,14 @@ class Scaling:
             var.solution.data[mask] = var.solution.data[mask] * (self.D_c_inv[var.labels.data[mask]])
 
     def analyze_numerics(self):
-        """
-        Analyzes the numerics of the optimization model
-        """
         #print numerics if no scaling is activated
         self.initiate_A_matrix()
         self.A_matrix.eliminate_zeros()
         self.print_numerics(0,True)
 
     def run_scaling(self):
-        """
-        Runs the scaling algorithm. Function called in _internal.py.
-        """
+        #cp = cProfile.Profile()
+        #cp.enable()
         logging.info(f"\n--- Start Scaling ---\n")
         t0 = time.perf_counter()
         self.initiate_A_matrix()
@@ -743,13 +779,10 @@ class Scaling:
         t1 = time.perf_counter()
         self.scaling_time = t1 - t0 #for benchmarking
         logging.info(f"\nTime to Scale Problem: {t1 - t0:0.1f} seconds\n")
+        #cp.disable()
+        #cp.print_stats("cumtime")
 
     def replace_data(self, name):
-        """
-        Replaces the data (coefficients) of the lhs and rhs of the constraint with the scaled data
-
-        :param name: name of the constraint for which the data is replaced with the scaled data
-        """
         constraint = self.model.constraints[name]
         #Get data
         lhs = constraint.coeffs.data
@@ -771,10 +804,6 @@ class Scaling:
                                         self.D_c_inv[mask_variables[entries_to_overwrite]])
 
     def adjust_upper_lower_bounds_variables(self):
-        """
-        Adjusts the upper and lower bounds of the variables whose coefficients are scaled.
-        If the bounds are not scaled, the problem might get infeasible.
-        """
         vars = self.model.variables
         for var in vars:
             mask = np.where(vars[var].labels.data != -1)
@@ -783,12 +812,6 @@ class Scaling:
             vars[var].lower.data[mask] = vars[var].lower.data[mask] * scaling_factors**(-1)
 
     def adjust_scaling_factors_of_skipped_rows(self, name):
-        """
-        Adjusts the column scaling factors corresponding to variables that are part of rows that are skipped.
-        If the scaling factors are not adjusted, the problem cannot be rescaled to the original problem.
-l
-        :param name: name of the constraint for which the scaling factors are adjusted
-        """
         constraint = self.model.constraints[name]
         #rows -> unnecessary to adjust scaling factor of rows with binary and integer variables as skipped anyways
         #cols
@@ -797,10 +820,6 @@ l
         self.D_c_inv[mask_variables[indices]] = 1
 
     def adjust_int_variables(self):
-        """
-        Adjusts the column scaling factors corresponding to binary and integer variables.
-        These columns are skipped in the scaling process since scaling is solely valid for continous variables.
-        """
         vars = self.model.variables
         for var in vars:
             if vars[var].attrs['binary'] or vars[var].attrs['integer']:
@@ -808,9 +827,6 @@ l
                 self.D_c_inv[vars[var].labels.data[mask]] = 1
 
     def overwrite_problem(self):
-        """
-        Overwrites the optimization problem with the scaled data.
-        """
         #pre-check variables -> skip binary and integer variables
         self.adjust_int_variables()
         #adjust scaling factors that have inf or nan values -> not really necessary anymore but might be a good security check
@@ -839,12 +855,6 @@ l
         self.model.objective.coeffs.data = self.model.objective.coeffs.data * scale_factors
 
     def get_min(self,A_matrix):
-        """
-        Gets the minimum values each column or row of the A matrix
-
-        :param A_matrix: A matrix of the optimization model (scipy.sparse.csr_matrix)
-        :return: minimum values of each column or row (np.array)
-        """
         d = A_matrix.data
         try:
             mins_values = np.minimum.reduceat(np.abs(d), A_matrix.indptr[:-1])
@@ -856,14 +866,6 @@ l
         return mins_values
 
     def get_full_geom(self,A_matrix,axis): #Very slow and less effective than simplified geom norm
-        """
-        Gets the full geometric mean of each column or row of the A matrix.
-        Note, this funtcion is very slow and is not yet ready to be used in the scaling process.
-
-        :param A_matrix: A matrix of the optimization model (scipy.sparse.csr_matrix)
-        :param axis: axis along which the geometric mean is calculated
-        :return: geometric mean of each column or row
-        """
         d = A_matrix.data
         geom = np.ones(len(A_matrix.indptr)-1)
         nonzero_entries = np.unique(list(A_matrix.nonzero()[axis]))
@@ -873,14 +875,6 @@ l
         return geom
 
     def update_A(self, vector, axis):
-        """
-        Updates the A matrix with the current scaling vector.
-        This function does not overwrite the original optimization model but is used for the scaling process.
-
-        :param vector: vector to update current scaling vectors
-        :param axis: axis for which the scaling vector is updated (0 for rows, 1 for columns)
-
-        """
         if axis == 1:
             self.A_matrix = sp.sparse.diags(vector, 0, format='csr').dot(self.A_matrix)
             self.D_r_inv = self.D_r_inv * vector
@@ -890,24 +884,11 @@ l
             self.D_c_inv = self.D_c_inv * vector
 
     def print_numerics_of_last_iteration(self):
-        """
-        Prints the numerics of the last iteration of the scaling process.
-        """
         self.A_matrix =  sp.sparse.diags(self.D_r_inv, 0, format='csr').dot(self.A_matrix_copy).dot(sp.sparse.diags(self.D_c_inv, 0, format='csr'))
         self.rhs = self.rhs_copy * self.D_r_inv
         self.print_numerics(len(self.algorithm))
 
     def generate_numerics_string(self,label,index=None,A_matrix=None,var=None, is_rhs=False):
-        """
-        Generates a string for log-outputs during scaling.
-
-        :param label: label of the constraint
-        :param index: index of the A matrix
-        :param A_matrix: A matrix of the optimization model
-        :param var: variable of the optimization model
-        :param is_rhs: bool whether the string is computed for the right hand side
-        :return: string for log-outputs
-        """
         if is_rhs:
             cons_str = self.model.constraints.get_label_position(label)
             cons_str = cons_str[0] + str(list(cons_str[1].values()))
@@ -919,16 +900,7 @@ l
             var_str = var_str[0] + str(list(var_str[1].values()))
             return f"{A_matrix[index]} {var_str} in {cons_str}"
 
-    def print_numerics(self,i,no_scaling = False, benchmarking_output = False):
-        """
-        Prints the numerics of the optimization model.
-
-        :param i: iteration of the scaling process
-        :param no_scaling: bool whether no scaling is activated. Then only numerics are printed.
-        :param benchmarking_output: bool whether data for benchmarking is collected
-        :param cond_number: bool whether the condition number of the A matrix is computed
-        :return: numerical range of the A matrix and the right hand side as well as the condition number of the A matrix (if benchmarking_output is True
-        """
+    def print_numerics(self,i,no_scaling = False, benchmarking_output = False, cond_number = False): #ToDo: speed up cond_number; for now should be kept False as computation time too long otherwise
         data_coo = self.A_matrix.tocoo()
         A_abs = np.abs(data_coo.data)
         A_abs_nonzero = np.ma.masked_equal(A_abs,0.0,copy=False)
@@ -955,7 +927,19 @@ l
         if benchmarking_output: #for postprocessing
             range_lhs = np.log10(A_abs[index_max]) - np.log10(A_abs[index_min])
             range_rhs = np.log10(np.abs(self.rhs[rhs_max_index])) - np.log10(np.abs(self.rhs[rhs_min_index]))
-            return range_lhs, range_rhs
+            cond = 0
+            if cond_number:
+                try:
+                    cp = cProfile.Profile()
+                    cp.enable()
+                    sv_max = sp.sparse.linalg.svds(data_coo, return_singular_vectors=False, k=1, which='LM')[0]
+                    sv_min = sp.sparse.linalg.svds(data_coo, return_singular_vectors=False, k=1, which='SM')[0]
+                    cond = sv_max / sv_min
+                    cp.disable()
+                    cp.print_stats("cumtime")
+                except:
+                    print("SVD did not converge")
+            return range_lhs, range_rhs, cond
         else:
             #Prints
             if no_scaling:
@@ -980,9 +964,6 @@ l
 
 
     def iter_scaling(self):
-        """
-        Generates the row and column scaling factors.
-        """
         #transform A matrix to csr matrix for better computational properties
         self.A_matrix.eliminate_zeros()
         self.A_matrix = sp.sparse.csr_matrix(self.A_matrix)
@@ -1013,6 +994,23 @@ l
                 if i < len(self.algorithm):
                     self.print_numerics(i)
 
+            #ToDo add rhs to row scaling
+            elif algo == "full_geom":
+                #update row scaling vector
+                geom = self.get_full_geom(self.A_matrix, 0)
+                r_vector = 1 / geom
+                r_vector = np.power(2, np.round(np.emath.logn(2, r_vector)))
+                #update A and row scaling matrix
+                self.update_A(r_vector,1)
+                #update column scaling vector
+                geom = self.get_full_geom(self.A_matrix.tocsc(), 1)
+                c_vector = 1 / geom
+                c_vector = np.power(2, np.round(np.emath.logn(2, c_vector)))
+                #update A and column scaling matrix
+                self.update_A(c_vector,0)
+                # Print Numerics
+                if i < len(self.algorithm):
+                    self.print_numerics(i)
 
             elif algo == "geom":
                 # update row scaling vector
@@ -1060,3 +1058,7 @@ l
                 # Print Numerics
                 if i < len(self.algorithm):
                     self.print_numerics(i)
+
+
+
+

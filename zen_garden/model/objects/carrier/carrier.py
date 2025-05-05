@@ -1,6 +1,11 @@
 """
-Class defining a generic energy carrier.
+:Title:          ZEN-GARDEN
+:Created:        October-2021
+:Authors:        Alissa Ganter (aganter@ethz.ch),
+                Jacob Mannhardt (jmannhardt@ethz.ch)
+:Organization:   Laboratory of Reliability and Risk Engineering, ETH Zurich
 
+Class defining a generic energy carrier.
 The class takes as inputs the abstract optimization model. The class adds parameters, variables and
 constraints of a generic carrier and returns the abstract optimization model.
 """
@@ -17,9 +22,6 @@ from ..element import Element, GenericRule
 
 
 class Carrier(Element):
-    """
-    Class defining a generic energy carrier.
-    """
     # set label
     label = "set_carriers"
     # empty list of elements
@@ -49,7 +51,8 @@ class Carrier(Element):
         self.availability_export_yearly = self.data_input.extract_input_data("availability_export_yearly", index_sets=["set_nodes", "set_time_steps_yearly"], time_steps="set_time_steps_yearly", unit_category={"energy_quantity": 1})
         self.carbon_intensity_carrier_import = self.data_input.extract_input_data("carbon_intensity_carrier_import", index_sets=["set_nodes", "set_time_steps_yearly"], time_steps="set_time_steps_yearly", unit_category={"emissions": 1, "energy_quantity": -1})
         self.carbon_intensity_carrier_export = self.data_input.extract_input_data("carbon_intensity_carrier_export", index_sets=["set_nodes", "set_time_steps_yearly"], time_steps="set_time_steps_yearly",  unit_category={"emissions": 1, "energy_quantity": -1})
-        self.price_shed_demand = self.data_input.extract_input_data("price_shed_demand", index_sets=[], unit_category={"money": 1, "energy_quantity": -1})
+        self.price_shed_demand = self.data_input.extract_input_data("price_shed_demand", index_sets=["set_nodes", "set_time_steps_yearly"], time_steps="set_time_steps_yearly", unit_category={"money": 1, "energy_quantity": -1})
+        self.local_production_share = self.data_input.extract_input_data("local_production_share", index_sets=["set_nodes", "set_time_steps_yearly"],time_steps="set_time_steps_yearly", unit_category={})
 
     def overwrite_time_steps(self, base_time_steps):
         """ overwrites set_time_steps_operation
@@ -87,12 +90,13 @@ class Carrier(Element):
         # export price
         optimization_setup.parameters.add_parameter(name="price_export", index_names=["set_carriers", "set_nodes", "set_time_steps_operation"], doc='Parameter which specifies the export carrier price', calling_class=cls)
         # demand shedding price
-        optimization_setup.parameters.add_parameter(name="price_shed_demand", index_names=["set_carriers"], doc='Parameter which specifies the price to shed demand', calling_class=cls)
+        optimization_setup.parameters.add_parameter(name="price_shed_demand", index_names=["set_carriers","set_nodes", "set_time_steps_yearly"], doc='Parameter which specifies the price to shed demand', calling_class=cls)
         # carbon intensity carrier import
         optimization_setup.parameters.add_parameter(name="carbon_intensity_carrier_import", index_names=["set_carriers", "set_nodes", "set_time_steps_yearly"], doc='Parameter which specifies the carbon intensity of carrier import', calling_class=cls)
         # carbon intensity carrier exmport
         optimization_setup.parameters.add_parameter(name="carbon_intensity_carrier_export", index_names=["set_carriers", "set_nodes", "set_time_steps_yearly"], doc='Parameter which specifies the carbon intensity of carrier export', calling_class=cls)
-
+        #
+        optimization_setup.parameters.add_parameter(name="local_production_share",index_names=["set_carriers", "set_nodes", "set_time_steps_yearly"],doc='Required share of local production for demand coverage',calling_class=cls)
     @classmethod
     def construct_vars(cls, optimization_setup):
         """ constructs the pe.Vars of the class <Carrier>
@@ -163,6 +167,9 @@ class Carrier(Element):
         # energy balance
         rules.constraint_nodal_energy_balance()
 
+        #self sufficiency constraint
+        rules.constraint_regional_production_share()
+
         # add pe.Sets of the child classes
         for subclass in cls.__subclasses__():
             if len(optimization_setup.system[subclass.label]) > 0:
@@ -190,12 +197,7 @@ class CarrierRules(GenericRule):
         """ total cost of importing and exporting carrier
 
         .. math::
-            C_y^{\\mathcal{C}} = \\sum_{c\\in\\mathcal{C}}\\sum_{n\\in\\mathcal{N}}\\sum_{t\\in\\mathcal{T}} \\tau_t (O_{c,n,t} + O_{c,n,t}^{\\mathrm{shed}\\ \\mathrm{demand}})
-
-        :math:`O_{c,n,t}`: cost of importing and exporting carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`O_{c,n,t}^{\\mathrm{shed}\\ \\mathrm{demand}}`: cost of shedding demand of carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`\\tau_t`: duration of time step :math:`t`
-
+            C_y^{\mathcal{C}} = \sum_{c\in\mathcal{C}}\sum_{n\in\mathcal{N}}\sum_{t\in\mathcal{T}} \\tau_t (C_{c,n,t} + C_{c,n,t}^{\mathrm{shed}\ \mathrm{demand}})
 
         """
         times = self.get_year_time_step_duration_array()
@@ -212,10 +214,7 @@ class CarrierRules(GenericRule):
         """ total carbon emissions of importing and exporting carrier
 
         .. math::
-            E_y^{\\mathcal{C}} = \\sum_{c\\in\\mathcal{C}}\\sum_{n\\in\\mathcal{N}}\\sum_{t\\in\\mathcal{T}} \\tau_t \\theta_{c,n,t}^{\\mathrm{carrier}}
-
-        :math:`\\theta_{c,n,t}^{\\mathrm{carrier}}`: carbon emissions of importing and exporting carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`\\tau_t`: duration of time step :math:`t`
+            E_y^{\mathcal{C}} = \sum_{c\in\mathcal{C}}\sum_{n\in\mathcal{N}}\sum_{t\in\mathcal{T}} \\tau_t E_{c,n,t}
 
         """
         term_summed_carbon_emissions_carrier = (
@@ -231,16 +230,10 @@ class CarrierRules(GenericRule):
         """node- and time-dependent carrier availability to import/export from outside the system boundaries
 
         .. math::
-            \\underline{U}_{c,n,t} \\leq \\underline{a}_{c,n,t}
+            U_{c,n,t} \\leq a_{c,n,t}^\mathrm{import}
 
         .. math::
-            \\overline{U}_{c,n,t} \\leq \\overline{a}_{c,n,t}
-
-        :math:`\\underline{U}_{c,n,t}`: flow of carrier :math:`c` imported at node :math:`n` and time step :math:`t`\n
-        :math:`\\overline{U}_{c,n,t}`: flow of carrier :math:`c` exported at node :math:`n` and time step :math:`t`\n
-        :math:`\\underline{a}_{c,n,t}`: availability of carrier :math:`c` to import at node :math:`n` and time step :math:`t`\n
-        :math:`\\overline{a}_{c,n,t}`: availability of carrier :math:`c` to export at node :math:`n` and time step :math:`t`
-
+            V_{c,n,t} \\leq a_{c,n,t}^\mathrm{export}
         """
 
         lhs_imp = self.variables["flow_import"]
@@ -257,18 +250,9 @@ class CarrierRules(GenericRule):
     def constraint_availability_import_export_yearly(self):
         """node- and year-dependent carrier availability to import/export from outside the system boundaries
 
-        .. math::
-            \\underline{a}_{c,n,y}^\\mathrm{Y} \\geq \\sum_{t\\in\\mathcal{T}}\\tau_t \\underline{U}_{c,n,t}
-
-        .. math::
-            \\overline{a}_{c,n,y}^\\mathrm{Y} \\geq \\sum_{t\\in\\mathcal{T}}\\tau_t \\overline{U}_{c,n,t}
-
-        :math:`\\underline{a}_{c,n,y}^\\mathrm{Y}`: yearly availability of carrier :math:`c` to import at node :math:`n`\n
-        :math:`\\overline{a}_{c,n,y}^\\mathrm{Y}`: yearly availability of carrier :math:`c` to export at node :math:`n`\n
-        :math:`\\tau_t`: is the duration of time step :math:`t`\n
-        :math:`\\underline{U}_{c,n,t}`: flow of carrier :math:`c` imported at node :math:`n` at time step :math:`t`\n
-        :math:`\\overline{U}_{c,n,t}`: flow of carrier :math:`c` exported at node :math:`n` at time step :math:`t`
-
+         .. math::
+            a_{c,n,y}^\mathrm{import} \geq \\sum_{t\\in\mathcal{T}}\\tau_t U_{c,n,t}
+            a_{c,n,y}^\mathrm{export} \geq \\sum_{t\\in\mathcal{T}}\\tau_t V_{c,n,t}
 
         """
         # The constraint is only constrained if the availability is finite
@@ -292,12 +276,7 @@ class CarrierRules(GenericRule):
         """ cost of importing and exporting carrier
 
         .. math::
-           O_{c,n,t} = \\underline{u}_{c,n,t} \\underline{U}_{c,n,t} - \\overline{v}_{c,n,t} \\overline{U}_{c,n,t}
-
-        :math:`\\underline{u}_{c,n,t}`: import price of carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`\\overline{v}_{c,n,t}`: export price of carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`\\underline{U}_{c,n,t}`: flow of carrier :math:`c` imported at node :math:`n` and time step :math:`t`\n
-        :math:`\\overline{U}_{c,n,t}`: flow of carrier :math:`c` exported at node :math:`n` and time step :math:`t`
+           C_{c,n,t} = u_{c,n,t} U_{c,n,t} - v_{c,n,t} V_{c,n,t}
 
         """
 
@@ -314,22 +293,26 @@ class CarrierRules(GenericRule):
         """ cost and limit of shedding demand of carrier
 
         .. math::
-           O_{c,n,t}^{\\mathrm{shed}\\ \\mathrm{demand}} = D_{c,n,t} \\nu_c \n
-           D_{c,n,t} \\leq d_{c,n,t}
-
-        :math:`O_{c,n,t}^{\\mathrm{shed}\\ \\mathrm{demand}}`: total cost of shedding demand of carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`\\nu_c`: price to shed demand of carrier :math:`c`\n
-        :math:`D_{c,n,t}`: shed demand of carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`d_{c,n,t}`: demand of carrier :math:`c` at node :math:`n` and time step :math:`t`
-
+           C_{c,n,t}^{\mathrm{shed}\ \mathrm{demand}} = D_{c,n,t} \\nu_c
+           D_{c,n,t} \leq d_{c,n,t}
 
         """
+        # Get the time step mapping to convert yearly price to operation time steps
+        times = self.get_year_time_step_array()
+
+        # Convert the price from yearly to operation time steps
+        price_shed_demand_operation = (
+                self.parameters.price_shed_demand.broadcast_like(times) * times
+        ).sum("set_time_steps_yearly")
 
         ### mask for finite price, otherwise the shed demand is zero
-        mask = self.parameters.price_shed_demand != np.inf
+        mask = price_shed_demand_operation != np.inf
 
-        # cost of shedding demand
-        lhs_cost = (self.variables["cost_shed_demand"] - self.parameters.price_shed_demand * self.variables["shed_demand"]).where(mask)
+        # cost of shedding demand with location and time-dependent prices
+        lhs_cost = (
+                self.variables["cost_shed_demand"] -
+                price_shed_demand_operation * self.variables["shed_demand"]
+        ).where(mask)
         rhs_cost = 0
         constraints_cost = lhs_cost == rhs_cost
 
@@ -338,20 +321,14 @@ class CarrierRules(GenericRule):
         rhs_shed_demand = self.parameters.demand.where(mask, 0.0)
         constraints_shed_demand = lhs_shed_demand <= rhs_shed_demand
 
-        self.constraints.add_constraint("constraint_cost_shed_demand",constraints_cost)
-        self.constraints.add_constraint("constraint_limit_shed_demand",constraints_shed_demand)
+        self.constraints.add_constraint("constraint_cost_shed_demand", constraints_cost)
+        self.constraints.add_constraint("constraint_limit_shed_demand", constraints_shed_demand)
 
     def constraint_carbon_emissions_carrier(self):
         """ carbon emissions of importing and exporting carrier
 
         .. math::
-           \\theta_{c,n,t}^{\\mathrm{carrier}} = \\underline{\\epsilon_c} \\underline{U}_{c,n,t} - \\overline{\\epsilon_c} \\overline{U}_{c,n,t}
-
-        :math:`\\theta_{c,n,t}^{\\mathrm{carrier}}`: carbon emissions of importing and exporting carrier :math:`c` at node :math:`n` and time step :math:`t`\n
-        :math:`\\underline{\\epsilon_c}`: carbon intensity of carrier import :math:`c`\n
-        :math:`\\overline{\\epsilon_c}`: carbon intensity of carrier export :math:`c`\n
-        :math:`\\underline{U}_{c,n,t}`: flow of carrier :math:`c` imported at node :math:`n` and time step :math:`t`\n
-        :math:`\\overline{U}_{c,n,t}`: flow of carrier :math:`c` exported at node :math:`n` and time step :math:`t`
+           E_{c,n,t} = \\epsilon_c (U_{c,n,t} - V_{c,n,t})
 
         """
         # create times xarray with 1 where the operation time step is in the year
@@ -376,24 +353,10 @@ class CarrierRules(GenericRule):
 
         .. math::
             0 = -(d_{c,n,t}-D_{c,n,t})
-            + \\sum_{i\\in\\mathcal{I}}(\\overline{G}_{c,i,n,t}-\\underline{G}_{c,i,n,t})
-            + \\sum_{j\\in\\mathcal{J}}(\\sum_{e\\in\\underline{\\mathcal{E}}}(F_{j,e,t}-F^\\mathrm{l}_{j,e,t})-\\sum_{e'\\in\\overline{\\mathcal{E}}}F_{j,e',t})
-            + \\sum_{k\\in\\mathcal{K}}(\\overline{H}_{k,n,t}-\\underline{H}_{k,n,t})
-            + \\underline{U}_{c,n,t} - \\overline{U}_{c,n,t}
-
-        Sources of carrier :math:`c` at node :math:`n` and time step :math:`t`:\n
-        :math:`\\overline{G}_{c,i,n,t}`: output flow of carrier :math:`c` from all conversion technologies :math:`i` at node :math:`n` at time step :math:`t`\n
-        :math:`F_{j,e,t}`: transported flow of carrier :math:`c` on ingoing edges :math:`e` minues the losses :math:`F^\\mathrm{l}_{j,e,t})` of all transport technologies :math:`j` at time step :math:`t`\n
-        :math:`\\overline{H}_{k,n,t}`: output flow of carrier :math:`c` from all storage technologies :math:`k` at node :math:`n` at time step :math:`t`\n
-        :math:`\\underline{U}_{c,n,t}`: flow of carrier :math:`c` imported at node :math:`n` at time step :math:`t`\n
-
-        Sinks of carrier :math:`c` at node :math:`n` and time step :math:`t`:\n
-        :math:`d_{c,n,t}`: demand of carrier :math:`c` at node :math:`n` at time step :math:`t` minus the shed demand :math:`D_{c,n,t}`\n
-        :math:`\\underline{G}_{c,i,n,t}`: input flow of carrier :math:`c` to all conversion technologies :math:`i` at node :math:`n` at time step :math:`t`\n
-        :math:`F_{j,e',t}`: transported flow of carrier :math:`c` on outgoing edges :math:`e'` at time step :math:`t`\n
-        :math:`\\underline{H}_{k,n,t}`: input flow of carrier :math:`c` to all storage technologies :math:`k` at node :math:`n` at time step :math:`t`\n
-        :math:`\\overline{U}_{c,n,t}`: flow of carrier :math:`c` exported at node :math:`n` at time step :math:`t`
-
+            + \\sum_{i\\in\mathcal{I}}(\\overline{G}_{c,i,n,t}-\\underline{G}_{c,i,n,t})
+            + \\sum_{j\\in\mathcal{J}}\\sum_{e\\in\\underline{\mathcal{E}}}F_{j,e,t}-F^\mathrm{l}_{j,e,t})-\\sum_{e'\\in\\overline{\mathcal{E}}}F_{j,e',t})
+            + \\sum_{k\\in\mathcal{K}}(\\overline{H}_{k,n,t}-\\underline{H}_{k,n,t})
+            + U_{c,n,t} - V_{c,n,t}
 
         """
 
@@ -436,7 +399,7 @@ class CarrierRules(GenericRule):
                 in_vars_plus = self.variables["flow_transport"].labels.loc[techs, edges_in, :].data
                 in_vars_plus = in_vars_plus.reshape((-1, in_vars_plus.shape[-1])).T
                 in_coefs_plus = np.ones_like(in_vars_plus)
-                in_vars_minus = self.variables["flow_transport_loss"].labels.loc[techs, edges_in, :].data
+                in_vars_minus = self.variables["flow_transport_loss"].labels.loc[techs, edges_out, :].data
                 in_vars_minus = in_vars_minus.reshape((-1, in_vars_minus.shape[-1])).T
                 in_coefs_minus = np.ones_like(in_vars_minus)
                 in_vars = np.concatenate([in_vars_plus, in_vars_minus], axis=1)
@@ -538,3 +501,71 @@ class CarrierRules(GenericRule):
 
         ### return
         self.constraints.add_constraint("constraint_nodal_energy_balance",constraints)
+
+    def constraint_regional_production_share(self):
+        """Regional production share constraint ensuring minimum local production for each timestep
+
+        For each region and carrier:
+        local_production(t) >= share * demand(t)
+
+        where local_production and demand are summed over all nodes in the region
+        """
+        for region_name in self.optimization_setup.system["set_regions"]:
+            # Get nodes in this region
+            region_nodes = self.optimization_setup.system["set_regions"][region_name]
+
+            for carrier in self.optimization_setup.sets["set_carriers"]:
+                # Get technologies that output this carrier
+                techs_out = [
+                    tech for tech in self.optimization_setup.sets["set_conversion_technologies"]
+                    if carrier in self.optimization_setup.sets["set_output_carriers"][tech]
+                ]
+
+                if not techs_out:
+                    continue
+
+                # Calculate production per timestep for all nodes in region
+                production = sum(
+                    self.variables["flow_conversion_output"]
+                        .loc[techs_out, [carrier], node]
+                        .sum(["set_conversion_technologies", "set_output_carriers"])
+                    for node in region_nodes
+                )
+
+
+                # Calculate demand per timestep for all nodes in region
+                # First get individual node demands to verify data
+                node_demands = []
+                for node in region_nodes:
+                    node_demand = self.parameters.demand.loc[{
+                        'set_carriers': "HP", #hardcoding approach to do HP because only deman in this model but better to have carrier
+                        'set_nodes': node
+                    }]
+                    node_demands.append(node_demand)
+
+                # Combine regional node demands by summing directly over the region nodes
+                demand = xr.concat(node_demands, dim='set_nodes').sel(set_nodes=list(region_nodes)).sum(
+                    dim='set_nodes')
+
+                # Calculate average share across nodes in region
+                shares = []
+                for node in region_nodes:
+                    node_share = self.parameters.local_production_share.sel(
+                        set_nodes=node,
+                        set_carriers=carrier,
+                        set_time_steps_yearly=self.optimization_setup.sets["set_time_steps_yearly"]
+                    )
+                    times = self.get_year_time_step_array()
+                    node_share = (node_share.broadcast_like(times) * times).sum("set_time_steps_yearly")
+                    shares.append(node_share)
+
+                    # Combine regional node shares using the same approach as demand
+                share = xr.concat(shares, dim='set_nodes').sel(set_nodes=list(region_nodes)).mean(
+                    dim='set_nodes')
+
+                rhs = share * demand
+
+                self.constraints.add_constraint(
+                    f"constraint_regional_production_share_{region_name}_{carrier}",
+                    production >= rhs
+                )

@@ -1,7 +1,10 @@
 """
-Default configuration.
+:Title:        ZEN-GARDEN
+:Created:      October-2021
+:Authors:      Alissa Ganter (aganter@ethz.ch)
+:Organization: Laboratory of Reliability and Risk Engineering, ETH Zurich
 
-Changes from the default values are specified in config.py (folders data/tests) and system.py (individual datasets)
+Default configuration. Changes from the default values are specified in config.py (folders data/tests) and system_test.py (individual datasets)
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -55,11 +58,7 @@ class Subsets(Subscriptable):
         "set_storage_technologies": [],
     }
 
-
 class HeaderDataInputs(Subscriptable):
-    """
-    Header data inputs for the model
-    """
     set_nodes: str = "node"
     set_edges: str = "edge"
     set_location: str = "location"
@@ -83,21 +82,18 @@ class HeaderDataInputs(Subscriptable):
     set_capacity_types: str = "capacity_type"
 
 class System(Subscriptable):
-    """
-    Class which contains the system configuration. This defines for example the set of carriers, technologies, etc.
-    """
+    model_config = ConfigDict(extra="allow")
     set_carriers: list[str] = []
     set_capacity_types: list[str] = ["power", "energy"]
     set_conversion_technologies: list[str] = []
     set_storage_technologies: list[str] = []
     set_retrofitting_technologies: list[str] = []
     storage_periodicity: bool = True
-    multiyear_periodicity: bool = False
     set_transport_technologies: list[str] = []
     set_transport_technologies_loss_exponential: list[str] = []
+    set_regions: dict[str, list[str]] = {}
     double_capex_transport: bool = False
     set_nodes: list[str] = []
-    coords: dict[str, dict[str, float]] = {}
     exclude_parameters_from_TSA: bool = True
     conduct_scenario_analysis: bool = False
     run_default_scenario: bool = True
@@ -107,7 +103,7 @@ class System(Subscriptable):
     reference_year: int = 2024
     unaggregated_time_steps_per_year: int = 8760
     aggregated_time_steps_per_year: int = 10
-    conduct_time_series_aggregation: bool = False
+    conduct_time_series_aggregation: bool = True
     optimized_years: int = 1
     interval_between_years: int = 1
     use_rolling_horizon: bool = False
@@ -119,54 +115,46 @@ class SolverOptions(Subscriptable):
     pass
 
 class Solver(Subscriptable):
-    """
-    Class which contains the solver configuration. This defines for example the solver options, scaling, etc.
-    """
     name: str = "gurobi"
     solver_options: SolverOptions = SolverOptions()
     check_unit_consistency: bool = True
     solver_dir: str = ".//outputs//solver_files"
     keep_files: bool = False
     io_api: str = "lp"
-    save_duals: bool = False
-    save_parameters: bool = True
-    selected_saved_parameters: list = [] # if empty, all parameters are saved
-    selected_saved_variables: list = [] # if empty, all variables are saved
+    add_duals: bool = False
+    recommend_base_units: bool = False
+    immutable_unit: list[str] = []
+    range_unit_exponents: dict[str, int] = {"min": -1, "max": 1, "step_width": 1}
+    rounding_decimal_points_tsa: int = 4
     linear_regression_check: dict[str, float] = {
         "eps_intercept": 0.1,
         "epsRvalue": 1 - (1e-5),
     }
-    round_parameters: bool = False
     rounding_decimal_points_units: int = 6
+    round_parameters: bool = True
     rounding_decimal_points_capacity: int = 4
-    rounding_decimal_points_tsa: int = 4
     analyze_numerics: bool = True
-    run_diagnostics: bool = False
     use_scaling: bool = True
     scaling_include_rhs: bool = True
     scaling_algorithm: Union[list[str],str] = ["geom","geom","geom"]
 
 
 class TimeSeriesAggregation(Subscriptable):
-    """
-    Class which contains the time series aggregation configuration. This defines for example the clustering method, etc.
-    """
     slv: Solver = Solver()
     clusterMethod: str = "hierarchical"
     solver: str = slv.name
-    hoursPerPeriod: int = 1 # keep this at 1
+    hoursPerPeriod: int = 1
     extremePeriodMethod: Optional[str] = "None"
     rescaleClusterPeriods: bool = False
     representationMethod: str = "meanRepresentation"
     resolution: int = 1
+    segmentation: bool = False
+    noSegments: int = 12
 
 class Analysis(Subscriptable):
-    """
-    Class which contains the analysis configuration. This defines for example the objective function, output settings, etc.
-    """
     dataset: str = ""
     objective: str = "total_cost"
-    sense: str = "min"
+    sense: str = "minimize"
     subsets: Subsets = Subsets()
     header_data_inputs: HeaderDataInputs = HeaderDataInputs()
     time_series_aggregation: TimeSeriesAggregation = TimeSeriesAggregation()
@@ -174,12 +162,10 @@ class Analysis(Subscriptable):
     overwrite_output: bool = True
     output_format: str = "h5"
     earliest_year_of_data: int = 1900
-    zen_garden_version: str = None
+    save_benchmarking_results: bool = False
+    zen_garden_version: str = importlib.metadata.version("zen-garden")
 
 class Config(Subscriptable):
-    """
-    Class which contains the configuration of the model. This includes the configuratins of the system, solver, and analysis as well as the dictionary of scenarios.
-    """
     analysis: Analysis = Analysis()
     solver: Solver = Solver()
     system: System = System()
