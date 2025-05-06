@@ -1,8 +1,8 @@
 {
     "analysis": {
-        "dataset":"Data_HP"
+        "dataset":"ZEN-Model_HP"
     },
     "solver": {
-        "name":"highs"
+        "name":"gurobi"
     }
 }
