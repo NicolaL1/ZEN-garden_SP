@@ -1,0 +1,13 @@
+technology,capacity_type,location,0,1,2,3,4,5
+heat_pump,power,DE,0.0,0.0,58.1229,15.5447,135.5633,83.1456
+photovoltaics,power,DE,0.0,18.8051,18.9758,44.7285,88.837,43.3069
+wind_offshore,power,DE,0.0,0.0,0.0,0.0,0.0,27.84
+wind_onshore,power,DE,0.0,13.8701,32.2681,33.926,26.9084,0.0
+heat_pump,power,CH,0.0,3.9224,3.0101,1.2532,26.3671,3.0101
+photovoltaics,power,CH,19.8619,5.6449,15.6101,12.3549,1.4408,1.1593
+wind_offshore,power,CH,0.0,0.0,0.0,0.0,0.0,0.0
+wind_onshore,power,CH,0.0,7.629,2.0601,0.5098,9.5389,0.329
+heat_pump,power,ROE,242.9228,165.6733,111.6124,354.1176,433.3192,129.963
+photovoltaics,power,ROE,77.0591,77.0139,110.6884,127.6884,162.3853,125.7823
+wind_offshore,power,ROE,0.0,0.0,0.0,0.0,10.9574,3.387
+wind_onshore,power,ROE,165.2307,157.7038,174.3556,192.5056,157.7731,343.335
