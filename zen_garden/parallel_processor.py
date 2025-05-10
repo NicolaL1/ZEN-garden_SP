@@ -65,10 +65,7 @@ class ParallelProcessor:
                     step=step
                 )
 
-                #subfolder = os.path.join(self.config.analysis['folder_output'], os.path.basename(subfolder))
-                dataset_name = os.path.basename(self.config.analysis['dataset'].rstrip("/\\"))
-                subfolder = os.path.join(self.config.analysis['folder_output'], dataset_name)
-                #
+                subfolder = os.path.join(self.config.analysis['folder_output'], os.path.basename(subfolder))
                 output_path = os.path.abspath(self.config.analysis['folder_output'])
                 subfolder_path = os.path.abspath(subfolder)
                 if not subfolder_path.startswith(output_path):

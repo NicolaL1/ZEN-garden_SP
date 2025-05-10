@@ -4,7 +4,7 @@
 :Authors:      Alissa Ganter (aganter@ethz.ch)
 :Organization: Laboratory of Reliability and Risk Engineering, ETH Zurich
 
-Default configuration. Changes from the default values are specified in config.py (folders data/tests) and system_test.py (individual datasets)
+Default configuration. Changes from the default values are specified in config.py (folders data/tests) and system.py (individual datasets)
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -115,7 +115,7 @@ class SolverOptions(Subscriptable):
     pass
 
 class Solver(Subscriptable):
-    name: str = "gurobi"
+    name: str = "highs"
     solver_options: SolverOptions = SolverOptions()
     check_unit_consistency: bool = True
     solver_dir: str = ".//outputs//solver_files"

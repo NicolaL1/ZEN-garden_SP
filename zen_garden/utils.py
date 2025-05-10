@@ -720,7 +720,7 @@ class HDFPandasSerializer():
 
 class InputDataChecks:
     """
-    This class checks if the input data (folder/file structure, system_test.py settings, element definitions, etc.) is defined correctly
+    This class checks if the input data (folder/file structure, system.py settings, element definitions, etc.) is defined correctly
     """
 
     def __init__(self, config, optimization_setup):
@@ -736,11 +736,11 @@ class InputDataChecks:
 
     def check_technology_selections(self):
         """
-        Checks selection of different technologies in system_test.py file
+        Checks selection of different technologies in system.py file
         """
-        # Checks if at least one technology is selected in the system_test.py file
-        assert len(self.system["set_conversion_technologies"] + self.system["set_transport_technologies"] + self.system["set_storage_technologies"]) > 0, f"No technology selected in system_test.py"
-        # Checks if identical technologies are selected multiple times in system_test.py file and removes possible duplicates
+        # Checks if at least one technology is selected in the system.py file
+        assert len(self.system["set_conversion_technologies"] + self.system["set_transport_technologies"] + self.system["set_storage_technologies"]) > 0, f"No technology selected in system.py"
+        # Checks if identical technologies are selected multiple times in system.py file and removes possible duplicates
         for tech_list in ["set_conversion_technologies", "set_transport_technologies", "set_storage_technologies"]:
             techs_selected = self.system[tech_list]
             unique_elements = list(np.unique(techs_selected))
@@ -822,16 +822,16 @@ class InputDataChecks:
 
     def check_dataset(self):
         """
-        Ensures that the dataset chosen in the config does exist and contains a system_test.py file
+        Ensures that the dataset chosen in the config does exist and contains a system.py file
         """
         dataset = os.path.basename(self.analysis["dataset"])
         dirname = os.path.dirname(self.analysis["dataset"])
         assert os.path.exists(dirname),f"Requested folder {dirname} is not a valid path"
         assert os.path.exists(self.analysis["dataset"]),f"The chosen dataset {dataset} does not exist at {self.analysis['dataset']} as it is specified in the config"
-        # check if chosen dataset contains a system_test.py file
+        # check if chosen dataset contains a system.py file
 
-        if not os.path.exists(os.path.join(self.analysis['dataset'], "system_test.py")) and not os.path.exists(os.path.join(self.analysis['dataset'], "system.json")):
-            raise FileNotFoundError(f"Neither system.json nor system_test.py not found in dataset: {self.analysis['dataset']}")
+        if not os.path.exists(os.path.join(self.analysis['dataset'], "system.py")) and not os.path.exists(os.path.join(self.analysis['dataset'], "system.json")):
+            raise FileNotFoundError(f"Neither system.json nor system.py not found in dataset: {self.analysis['dataset']}")
 
     def check_single_directed_edges(self, set_edges_input):
         """
@@ -902,9 +902,9 @@ class InputDataChecks:
         if os.path.exists(os.path.join(config.analysis["dataset"], "system.json")):
             with open(os.path.join(config.analysis["dataset"], "system.json"), "r") as file:
                 system = json.load(file)
-        # otherwise read system_test.py file
+        # otherwise read system.py file
         else:
-            system_path = os.path.join(config.analysis['dataset'], "system_test.py")
+            system_path = os.path.join(config.analysis['dataset'], "system.py")
             spec = importlib.util.spec_from_file_location("module", system_path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)

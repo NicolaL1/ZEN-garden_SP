@@ -32,7 +32,6 @@ class EnergySystem:
         :param optimization_setup: The OptimizationSetup of the EnergySystem class"""
 
         # the name
-        self.set_regions = None
         self.name = "EnergySystem"
         self._name = "EnergySystem"
         # set attributes
