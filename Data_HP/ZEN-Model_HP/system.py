@@ -56,7 +56,7 @@ system["conduct_uncertainty_opex"] = False
 system["conduct_uncertainty_capex"] =False
 system["conduct_uncertainty_combined"] = False
 
-system["optimized_years"]                = 12
+system["optimized_years"]                = 14
 system["interval_between_years"]          = 1
 system["use_rolling_horizon"]             = False
 system["years_in_rolling_horizon"]         = 1
