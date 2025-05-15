@@ -44,6 +44,13 @@ system['set_transport_technologies']      = ["Bauxite_transport",
 
 system['set_nodes']                      = ["AUS", "AUT", "CHN", "CZE", "ITA", "DEU", "JPN", "KOR", "ROE", "ROW", "USA", "BRA"]
 
+system['set_regions'] = {
+    "europe": ["AUT", "DEU", "CZE","ITA","ROE"],
+    "asia_pacific": ["AUS", "JPN", "KOR"],
+    "americas": ["USA", "BRA"],
+    "china": ["CHN"],
+    "rest": ["ROW"]
+}
 
 # time steps
 system["reference_year"]                 = 2022
